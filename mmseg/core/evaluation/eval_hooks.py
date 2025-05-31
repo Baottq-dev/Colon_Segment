@@ -1,6 +1,29 @@
 import os.path as osp
 
-from mmcv.runner import Hook
+try:
+    from mmcv.runner import Hook
+except ImportError:
+    # Trong MMCV 2.2.0, Hook đã chuyển sang mmengine
+    try:
+        from mmengine.hooks import Hook
+    except ImportError:
+        # Fallback đơn giản cho Hook
+        class Hook:
+            def __init__(self):
+                pass
+            
+            def after_train_iter(self, runner):
+                pass
+            
+            def after_train_epoch(self, runner):
+                pass
+                
+            def every_n_iters(self, runner, n):
+                return runner.iter % n == 0
+                
+            def every_n_epochs(self, runner, n):
+                return runner.epoch % n == 0
+
 from torch.utils.data import DataLoader
 
 

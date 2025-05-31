@@ -1,10 +1,12 @@
 import torch
 import torch.nn as nn
 import torch.utils.checkpoint as cp
-from mmcv.cnn import (ConvModule, build_conv_layer, build_norm_layer,
-                      constant_init, kaiming_init)
-from mmcv.runner import load_checkpoint
-from mmcv.utils.parrots_wrapper import _BatchNorm
+from mmcv.cnn import ConvModule, build_conv_layer, build_norm_layer
+from torch.nn.init import constant_, kaiming_normal_
+try:
+    from mmengine.runner import load_checkpoint
+except ImportError:
+    from mmcv.runner import load_checkpoint
 
 from mmseg.utils import get_root_logger
 from ..builder import BACKBONES
@@ -348,11 +350,13 @@ class CGNet(nn.Module):
         elif pretrained is None:
             for m in self.modules():
                 if isinstance(m, (nn.Conv2d, nn.Linear)):
-                    kaiming_init(m)
-                elif isinstance(m, (_BatchNorm, nn.GroupNorm)):
-                    constant_init(m, 1)
+                    kaiming_normal_(m.weight)
+                elif isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d, nn.GroupNorm)):
+                    constant_(m.weight, 1)
+                    if m.bias is not None:
+                        constant_(m.bias, 0)
                 elif isinstance(m, nn.PReLU):
-                    constant_init(m, 0)
+                    constant_(m.weight, 0)
         else:
             raise TypeError('pretrained must be a str or None')
 
@@ -363,5 +367,5 @@ class CGNet(nn.Module):
         if mode and self.norm_eval:
             for m in self.modules():
                 # trick: eval have effect on BatchNorm only
-                if isinstance(m, _BatchNorm):
+                if isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d, nn.GroupNorm)):
                     m.eval()

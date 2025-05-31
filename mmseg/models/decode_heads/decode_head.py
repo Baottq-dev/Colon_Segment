@@ -2,8 +2,25 @@ from abc import ABCMeta, abstractmethod
 
 import torch
 import torch.nn as nn
-from mmcv.cnn import normal_init
-from mmcv.runner import auto_fp16, force_fp32
+from torch.nn.init import normal_
+
+# Tương thích với MMCV 2.2.0
+try:
+    from mmcv.runner import auto_fp16, force_fp32
+except ImportError:
+    try:
+        from mmengine.runner import auto_fp16, force_fp32
+    except ImportError:
+        # Fallback đơn giản
+        def auto_fp16():
+            def decorator(func):
+                return func
+            return decorator
+            
+        def force_fp32(apply_to=None):
+            def decorator(func):
+                return func
+            return decorator
 
 from mmseg.core import build_pixel_sampler
 from mmseg.ops import resize
@@ -134,7 +151,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
 
     def init_weights(self):
         """Initialize weights of classification layer."""
-        normal_init(self.conv_seg, mean=0, std=0.01)
+        normal_(self.conv_seg.weight, mean=0, std=0.01)
 
     def _transform_inputs(self, inputs):
         """Transform inputs for decoder.

@@ -1,12 +1,15 @@
 import torch
 import torch.nn as nn
-from mmcv import is_tuple_of
 from mmcv.cnn import ConvModule
 
 from mmseg.ops import resize
 from ..builder import HEADS
 from .decode_head import BaseDecodeHead
 
+# Thay thế is_tuple_of bằng function đơn giản
+def is_tuple_of(obj, expected_type):
+    """Check if obj is a tuple and all elements are of expected_type."""
+    return isinstance(obj, tuple) and all(isinstance(item, expected_type) for item in obj)
 
 @HEADS.register_module()
 class LRASPPHead(BaseDecodeHead):

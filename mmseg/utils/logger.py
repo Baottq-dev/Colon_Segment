@@ -1,6 +1,23 @@
 import logging
 
-from mmcv.utils import get_logger
+try:
+    from mmcv.utils import get_logger
+except ImportError:
+    # Trong MMCV 2.2.0, get_logger có thể đã bị di chuyển
+    try:
+        from mmengine.logging import get_logger
+    except ImportError:
+        # Fallback đơn giản
+        def get_logger(name, log_file=None, log_level=logging.INFO):
+            logger = logging.getLogger(name)
+            if not logger.handlers:
+                handler = logging.StreamHandler()
+                formatter = logging.Formatter(
+                    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+                handler.setFormatter(formatter)
+                logger.addHandler(handler)
+                logger.setLevel(log_level)
+            return logger
 
 
 def get_root_logger(log_file=None, log_level=logging.INFO):

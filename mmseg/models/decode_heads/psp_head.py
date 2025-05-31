@@ -41,7 +41,8 @@ class PPM(nn.ModuleList):
                         1,
                         conv_cfg=self.conv_cfg,
                         norm_cfg=self.norm_cfg,
-                        act_cfg=self.act_cfg)))
+                        act_cfg=self.act_cfg,
+                        inplace=False)))
 
     def forward(self, x):
         """Forward function."""
@@ -88,7 +89,8 @@ class PSPHead(BaseDecodeHead):
             padding=1,
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg,
-            act_cfg=self.act_cfg)
+            act_cfg=self.act_cfg,
+            inplace=False)
 
     def forward(self, inputs):
         """Forward function."""

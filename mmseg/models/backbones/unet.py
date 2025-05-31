@@ -1,9 +1,12 @@
+import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.utils.checkpoint as cp
 from mmcv.cnn import (UPSAMPLE_LAYERS, ConvModule, build_activation_layer,
-                      build_norm_layer, constant_init, kaiming_init)
+                      build_norm_layer)
 from mmcv.runner import load_checkpoint
-from mmcv.utils.parrots_wrapper import _BatchNorm
+from torch.nn.init import constant_, kaiming_normal_
+# from mmcv.utils.parrots_wrapper import _BatchNorm  # Không cần thiết trong MMCV 2.2.0
 
 from mmseg.utils import get_root_logger
 from ..builder import BACKBONES
@@ -391,8 +394,7 @@ class UNet(nn.Module):
         super(UNet, self).train(mode)
         if mode and self.norm_eval:
             for m in self.modules():
-                # trick: eval have effect on BatchNorm only
-                if isinstance(m, _BatchNorm):
+                if isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)):
                     m.eval()
 
     def _check_input_devisible(self, x):
@@ -421,8 +423,9 @@ class UNet(nn.Module):
         elif pretrained is None:
             for m in self.modules():
                 if isinstance(m, nn.Conv2d):
-                    kaiming_init(m)
-                elif isinstance(m, (_BatchNorm, nn.GroupNorm)):
-                    constant_init(m, 1)
+                    kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                elif isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)):
+                    constant_(m.weight, 1)
+                    constant_(m.bias, 0)
         else:
             raise TypeError('pretrained must be a str or None')

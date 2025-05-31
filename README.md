@@ -1,41 +1,118 @@
 # ColonFormer: An Efficient Transformer based Method for Colon Polyp Segmentation
-This repository contains the official Pytorch implementation of training & evaluation code for ColonFormer.
 
-### Environment
-- Creating a virtual environment in terminal: `conda create -n ColonFormer`
-- Install `CUDA 11.1` and `pytorch 1.7.1`
-- Install other requirements: `pip install -r requirements.txt`
+Đây là implementation của ColonFormer - một phương pháp segmentation polyp đại tràng hiệu quả sử dụng Transformer architecture.
 
-### Dataset
-Downloading necessary data:
-1. For `Experiment 1` in our paper: 
-    - Download testing dataset and move it into `./data/TestDataset/`, which can be found in this [download link (Google Drive)](https://drive.google.com/file/d/1o8OfBvYE6K-EpDyvzsmMPndnUMwb540R/view).
-    - Download training dataset and move it into `./data/TrainDataset/`, which can be found in this [download link (Google Drive)](https://drive.google.com/file/d/1lODorfB33jbd-im-qrtUgWnZXxB94F55/view).
-2. For `Experiment 2` and `Experiment 3`:
-    - All datasets we use in this experiments can be found in this [download link (Google Drive)](https://drive.google.com/file/d/1ExJeVqbcBn6yy-gdGqEYw5phJywHIUXZ/view?usp=sharing)
-    
-### Training
-Download MiT's pretrained `weights` 
-(
-[google drive](https://drive.google.com/drive/folders/1b7bwrInTW4VLEm27YawHOAMSMikga2Ia?usp=sharing) | 
-[onedrive](https://connecthkuhk-my.sharepoint.com/:f:/g/personal/xieenze_connect_hku_hk/EvOn3l1WyM5JpnMQFSEO5b8B7vrHw9kDaJGII-3N9KNhrg?e=cpydzZ)
-) on ImageNet-1K, and put them in a folder `pretrained/`.
-Config hyper-parameters and run `train.py` for training. For example:
+> **Lưu ý**: Đây là phiên bản đã được điều chỉnh để tương thích với MMCV 2.2.0. Repository gốc và paper chính thức có thể tìm thấy tại [ducnt9907/ColonFormer](https://github.com/ducnt9907/ColonFormer).
+
+## 🎯 Tính năng chính
+
+- **Mix Transformer (MiT) Backbone**: Sử dụng các phiên bản MIT-B0 đến MIT-B5
+- **Context Feature Pyramid (CFP) Module**: Module đặc trưng với dilated convolution đa tỷ lệ
+- **Axial Attention Mechanism**: Cơ chế attention theo trục cho hiệu quả tính toán
+- **Reverse Attention**: Cơ chế attention ngược để tập trung vào vùng quan trọng
+- **Multi-scale Output**: 4 feature maps ở các độ phân giải khác nhau
+
+## 🔧 Môi trường
+
+### Yêu cầu hệ thống
+
+```bash
+conda create -n Colon python=3.9
+conda activate Colon
 ```
+
+### Cài đặt dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### Thư viện chính
+
+- Python 3.9
+- PyTorch 2.1.2+cu118
+- MMCV 2.2.0
+- timm 0.9.12
+- albumentations
+- OpenCV
+
+## 📥 Tải dữ liệu
+
+### Dataset cho training và testing
+
+1. **Training Dataset**:
+
+   - Tải từ [Google Drive](https://drive.google.com/file/d/1lODorfB33jbd-im-qrtUgWnZXxB94F55/view)
+   - Giải nén và đặt vào thư mục `./data/TrainDataset/`
+
+2. **Testing Dataset**:
+   - Tải từ [Google Drive](https://drive.google.com/file/d/1o8OfBvYE6K-EpDyvzsmMPndnUMwb540R/view)
+   - Giải nén và đặt vào thư mục `./data/TestDataset/`
+
+## 📁 Cấu trúc dữ liệu
+
+Tổ chức dữ liệu như sau:
+
+```
+data/
+├── TrainDataset/
+│   ├── image/          # Ảnh training
+│   └── mask/           # Mask tương ứng
+└── TestDataset/
+    ├── image/          # Ảnh test
+    └── mask/           # Mask tương ứng
+```
+
+## 🚀 Sử dụng
+
+### Training
+
+```bash
 python train.py --backbone b3 --train_path ./data/TrainDataset --train_save ColonFormerB3
 ```
-Here is an example in [Google Colab](https://colab.research.google.com/drive/1vUgh7XCiVyboYIAaRBQ2TDVMi8v0CLLK?usp=sharing)
-### Evaluation
-For evaluation, specific your backbone version, weight's path and dataset and run `test.py`. For example:
-```
+
+**Các tham số có sẵn:**
+
+- `--backbone`: b0, b1, b2, b3, b4, b5 (mặc định: b3)
+- `--num_epochs`: Số epochs (mặc định: 20)
+- `--batchsize`: Batch size (mặc định: 8)
+- `--init_lr`: Learning rate (mặc định: 1e-4)
+- `--train_path`: Đường dẫn dữ liệu training
+- `--train_save`: Tên folder lưu checkpoint
+
+### Testing
+
+```bash
 python test.py --backbone b3 --weight ./snapshots/ColonFormerB3/last.pth --test_path ./data/TestDataset
 ```
-We provide some [pretrained weights](https://drive.google.com/drive/folders/1SVxluPlRVohkN6Q6hG-FpA9L8eapZuxa?usp=sharing) in case you need.
 
-### Citation
-If you find this code useful in your research, please consider citing:
+**Các tham số:**
 
-```
+- `--backbone`: Phiên bản backbone đã training
+- `--weight`: Đường dẫn checkpoint
+- `--test_path`: Đường dẫn dữ liệu test
+
+## 📊 Kiến trúc mô hình
+
+ColonFormer kết hợp:
+
+1. **Mix Transformer Backbone** để trích xuất multi-scale features
+2. **CFP Module** cho context modeling với dilated convolutions
+3. **Axial Attention** để capture long-range dependencies hiệu quả
+4. **Reverse Attention** để refine segmentation boundaries
+
+## 🔄 Thay đổi từ phiên bản gốc
+
+- Cập nhật tương thích với MMCV 2.2.0
+- Sửa lỗi import và initialization functions
+- Thêm fallback implementations cho các module bị deprecated
+- Tối ưu training loop với progress bars và metrics tracking
+
+## 📝 Citation
+
+Nếu sử dụng code này trong nghiên cứu, vui lòng cite paper gốc:
+
+```bibtex
 @article{duc2022colonformer,
   title={Colonformer: An efficient transformer based method for colon polyp segmentation},
   author={Duc, Nguyen Thanh and Oanh, Nguyen Thi and Thuy, Nguyen Thi and Triet, Tran Minh and Dinh, Viet Sang},
@@ -47,25 +124,12 @@ If you find this code useful in your research, please consider citing:
 }
 ```
 
-```
-@inproceedings{ngoc2021neounet,
-  title={NeoUNet: Towards accurate colon polyp segmentation and neoplasm detection},
-  author={Ngoc Lan, Phan and An, Nguyen Sy and Hang, Dao Viet and Long, Dao Van and Trung, Tran Quang and Thuy, Nguyen Thi and Sang, Dinh Viet},
-  booktitle={Advances in Visual Computing: 16th International Symposium, ISVC 2021, Virtual Event, October 4-6, 2021, Proceedings, Part II},
-  pages={15--28},
-  year={2021},
-  organization={Springer}
-}
-```
+## 🙏 Acknowledgments
 
-```
-@article{thuan2023rabit,
-  title={RaBiT: An Efficient Transformer using Bidirectional Feature Pyramid Network with Reverse Attention for Colon Polyp Segmentation},
-  author={Thuan, Nguyen Hoang and Oanh, Nguyen Thi and Thuy, Nguyen Thi and Perry, Stuart and Sang, Dinh Viet},
-  journal={arXiv preprint arXiv:2307.06420},
-  year={2023}
-}
-```
+- Cảm ơn tác giả gốc [@ducnt9907](https://github.com/ducnt9907) cho implementation ColonFormer
+- Repository gốc: [ducnt9907/ColonFormer](https://github.com/ducnt9907/ColonFormer)
+- Paper: "ColonFormer: An Efficient Transformer based Method for Colon Polyp Segmentation" - IEEE Access 2022
 
+## 📄 License
 
-
+Dự án này được phân phối dưới license từ repository gốc. Xem [LICENSE](LICENSE) để biết thêm chi tiết.

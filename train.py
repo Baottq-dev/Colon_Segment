@@ -19,7 +19,7 @@ from torch.autograd import Variable
 from datetime import datetime
 import torch.nn.functional as F
 
-from albumentations.augmentations import transforms
+import albumentations as A
 from albumentations.core.composition import Compose, OneOf
 
 from mmseg import __version__
@@ -133,8 +133,18 @@ def train(train_loader, model, optimizer, epoch, lr_scheduler, args):
     size_rates = [0.75, 1, 1.25]
     loss_record = AvgMeter()
     dice, iou = AvgMeter(), AvgMeter()
-    with torch.autograd.set_detect_anomaly(True):
-        for i, pack in enumerate(train_loader, start=1):
+    
+    # Tracking time
+    epoch_start_time = time.time()
+    
+    # Progress bar setup với tqdm
+    print(f"\n==> Epoch {epoch}/{args.num_epochs}")
+    progress_bar = tqdm(train_loader, desc=f'Epoch {epoch}/{args.num_epochs}', 
+                       unit='batch', ncols=150, 
+                       bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
+    
+    with torch.autograd.set_detect_anomaly(False):  # Tắt anomaly detection
+        for i, pack in enumerate(progress_bar, start=1):
             if epoch <= 1:
                     optimizer.param_groups[0]["lr"] = (epoch * i) / (1.0 * total_step) * args.init_lr
             else:
@@ -172,12 +182,22 @@ def train(train_loader, model, optimizer, epoch, lr_scheduler, args):
                     dice.update(dice_score.data, args.batchsize)
                     iou.update(iou_score.data, args.batchsize)
 
-            # ---- train visualization ----
+            # Update progress bar với metrics
+            current_lr = optimizer.param_groups[0]['lr']
+            progress_bar.set_postfix({
+                'Loss': f'{loss_record.show():.4f}',
+                'Dice': f'{dice.show():.4f}',
+                'IoU': f'{iou.show():.4f}',
+                'LR': f'{current_lr:.6f}'
+            })
+            
+            # Final summary at end of epoch
             if i == total_step:
-                print('{} Training Epoch [{:03d}/{:03d}], '
-                        '[loss: {:0.4f}, dice: {:0.4f}, iou: {:0.4f}]'.
-                        format(datetime.now(), epoch, args.num_epochs,\
-                                loss_record.show(), dice.show(), iou.show()))
+                progress_bar.close()
+                epoch_time = time.time() - epoch_start_time
+                print(f'\n{datetime.now()} Training Epoch [{epoch:03d}/{args.num_epochs:03d}] COMPLETED')
+                print(f'Epoch time: {epoch_time:.2f}s ({epoch_time/60:.2f}m)')
+                print(f'Final metrics - Loss: {loss_record.show():.4f}, Dice: {dice.show():.4f}, IoU: {iou.show():.4f}')
 
     ckpt_path = save_path + 'last.pth'
     print('[Saving Checkpoint:]', ckpt_path)
@@ -207,8 +227,8 @@ if __name__ == '__main__':
                         default='./data/TrainDataset', help='path to train dataset')
     parser.add_argument('--train_save', type=str,
                         default='ConlonFormerB3')
-    parser.add_argument('--resume_path', type=str, help='path to checkpoint for resume training'
-                        default='')
+    parser.add_argument('--resume_path', type=str, 
+                        default='', help='path to checkpoint for resume training')
     args = parser.parse_args()
 
     save_path = 'snapshots/{}/'.format(args.train_save)
@@ -219,8 +239,8 @@ if __name__ == '__main__':
 
     train_img_paths = []
     train_mask_paths = []
-    train_img_paths = glob('{}/images/*'.format(args.train_path))
-    train_mask_paths = glob('{}/masks/*'.format(args.train_path))
+    train_img_paths = glob('{}/image/*'.format(args.train_path))
+    train_mask_paths = glob('{}/mask/*'.format(args.train_path))
     train_img_paths.sort()
     train_mask_paths.sort()
 
@@ -234,6 +254,20 @@ if __name__ == '__main__':
     )
 
     total_step = len(train_loader)
+
+    # Kiểm tra xem file pretrained có tồn tại không
+    pretrained_path = 'pretrained/mit_{}.pth'.format(args.backbone)
+    if not os.path.exists(pretrained_path):
+        print(f"Pretrained weights {pretrained_path} not found. Training from scratch.")
+        pretrained_path = None
+
+    # Print dataset info
+    print(f"\n==> Dataset Information:")
+    print(f"Training images: {len(train_img_paths)}")
+    print(f"Training masks: {len(train_mask_paths)}")
+    print(f"Batch size: {args.batchsize}")
+    print(f"Total steps per epoch: {total_step}")
+    print(f"Image size: {args.init_trainsize}x{args.init_trainsize}")
 
     model = UNet(backbone=dict(
                     type='mit_{}'.format(args.backbone),
@@ -253,7 +287,16 @@ if __name__ == '__main__':
                 auxiliary_head=None,
                 train_cfg=dict(),
                 test_cfg=dict(mode='whole'),
-                pretrained='pretrained/mit_{}.pth'.format(args.backbone)).cuda()
+                pretrained=pretrained_path).cuda()
+
+    # Print model info
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"\n==> Model Information:")
+    print(f"Backbone: MIT-{args.backbone}")
+    print(f"Total parameters: {total_params:,}")
+    print(f"Trainable parameters: {trainable_params:,}")
+    print(f"Model size: {total_params * 4 / 1024 / 1024:.2f} MB")
 
     # ---- flops and params ----
     params = model.parameters()

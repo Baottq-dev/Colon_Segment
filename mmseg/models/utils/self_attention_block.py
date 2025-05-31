@@ -1,5 +1,6 @@
 import torch
-from mmcv.cnn import ConvModule, constant_init
+from mmcv.cnn import ConvModule
+from torch.nn.init import constant_
 from torch import nn as nn
 from torch.nn import functional as F
 
@@ -94,7 +95,7 @@ class SelfAttentionBlock(nn.Module):
         """Initialize weight of later layer."""
         if self.out_project is not None:
             if not isinstance(self.out_project, ConvModule):
-                constant_init(self.out_project, 0)
+                constant_(self.out_project, 0)
 
     def build_project(self, in_channels, channels, num_convs, use_conv_module,
                       conv_cfg, norm_cfg, act_cfg):

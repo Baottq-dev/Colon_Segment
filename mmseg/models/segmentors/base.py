@@ -8,7 +8,19 @@ import numpy as np
 import torch
 import torch.distributed as dist
 import torch.nn as nn
-from mmcv.runner import auto_fp16
+
+try:
+    from mmcv.runner import auto_fp16
+except ImportError:
+    # Trong MMCV 2.2.0, auto_fp16 đã chuyển sang mmengine
+    try:
+        from mmengine.runner import auto_fp16
+    except ImportError:
+        # Fallback đơn giản cho auto_fp16
+        def auto_fp16(apply_to=None):
+            def decorator(func):
+                return func
+            return decorator
 
 
 class BaseSegmentor(nn.Module):

@@ -1,5 +1,16 @@
-from mmcv.utils import collect_env as collect_base_env
-from mmcv.utils import get_git_hash
+try:
+    from mmcv.utils import collect_env as collect_base_env
+    from mmcv.utils import get_git_hash
+except ImportError:
+    # Trong MMCV 2.2.0, các function này có thể đã bị di chuyển hoặc bỏ
+    try:
+        from mmengine.utils import collect_env as collect_base_env
+        from mmengine.utils import get_git_hash
+    except ImportError:
+        def collect_base_env():
+            return {}
+        def get_git_hash():
+            return "unknown"
 
 import mmseg
 
