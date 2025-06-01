@@ -29,7 +29,6 @@ conda activate Colon
 
 ```bash
 pip install -r requirements.txt
-pip install seaborn  # For visualization
 ```
 
 ### Core Libraries
@@ -211,8 +210,6 @@ The system automatically generates:
 - **Progress Bars**: Real-time training/testing progress with tqdm
 - **Metrics Visualization**: Automatic chart generation and saving
 - **Multi-dataset Support**: Enhanced testing on multiple datasets
-- **Error Handling**: Robust error handling and informative messages
-- **Training from Scratch**: Removed dependency on pretrained weights
 
 ### Performance Improvements
 

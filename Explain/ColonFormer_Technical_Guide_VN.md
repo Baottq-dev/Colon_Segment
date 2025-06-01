@@ -25,8 +25,6 @@ Phân đoạn polyp đại tràng (colon polyp segmentation) là bài toán th�
 
 **Mất cân bằng lớp**: Vùng polyp thường chiếm tỷ lệ rất nhỏ so với nền, gây khó khăn cho việc huấn luyện.
 
-_[HÌNH MINH HỌA 1.2: Tổng hợp các thách thức kỹ thuật trong phân đoạn polyp - biến đổi hình dạng, độ tương phản thấp, nhiễu, mất cân bằng lớp]_
-
 ## 2. Kiến Trúc Tổng Thể ColonFormer
 
 ### 2.1 Thiết Kế Mã Hóa-Giải Mã
@@ -47,7 +45,7 @@ ColonFormer sử dụng kiến trúc mã hóa-giải mã với các thành phầ
     Đầu Ra Cuối Cùng (H×W×1)
 ```
 
-_[HÌNH MINH HỌA 2.1: Sơ đồ kiến trúc tổng thể ColonFormer - luồng từ đầu vào qua bộ mã hóa MiT, đặc trưng đa tỷ lệ, bộ giải mã UPerHead đến đầu ra cuối cùng]_
+![HÌNH MINH HỌA 2.1: Sơ đồ kiến trúc tổng thể ColonFormer - luồng từ đầu vào qua bộ mã hóa MiT, đặc trưng đa tỷ lệ, bộ giải mã UPerHead đến đầu ra cuối cùng](2_1.png)
 
 ### 2.2 Luồng Xử Lý Dữ Liệu
 
