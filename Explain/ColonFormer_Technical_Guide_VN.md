@@ -2,34 +2,34 @@
 
 ## Tóm Tắt
 
-ColonFormer là một phương pháp phân đoạn polyp đại tràng tiên tiến sử dụng kiến trúc Transformer, kết hợp các ưu điểm của Vision Transformer với các mô-đun đặc trưng được thiết kế riêng cho bài toán y tế. Bài viết này phân tích sâu về các thành phần kiến trúc, lý thuyết đằng sau các quyết định thiết kế và giải thích chi tiết về tất cả các khía cạnh kỹ thuật của hệ thống.
+ColonFormer là một phương pháp phân đoạn polyp đại tràng (colon polyp segmentation) tiên tiến sử dụng kiến trúc Transformer, kết hợp các ưu điểm của Vision Transformer với các mô-đun đặc trưng được thiết kế riêng cho bài toán y tế. Bài viết này phân tích sâu về các thành phần kiến trúc, lý thuyết đằng sau các quyết định thiết kế và giải thích chi tiết về tất cả các khía cạnh kỹ thuật của hệ thống.
 
 ## 1. Tổng Quan Về Bài Toán Phân Đoạn Polyp Đại Tràng
 
 ### 1.1 Định Nghĩa Bài Toán
 
-Phân đoạn polyp đại tràng (colon polyp segmentation) là bài toán thị giác máy tính trong y tế, nhằm tự động xác định và phân đoạn chính xác vị trí của polyp trong hình ảnh nội soi đại tràng. Đây là bài toán phân đoạn ngữ nghĩa ở mức điểm ảnh, trong đó mỗi điểm ảnh trong ảnh được phân loại thành hai lớp:
+Phân đoạn polyp đại tràng (colon polyp segmentation) là bài toán thị giác máy tính (computer vision) trong y tế, nhằm tự động xác định và phân đoạn chính xác vị trí của polyp trong hình ảnh nội soi đại tràng (colonoscopy). Đây là bài toán phân đoạn ngữ nghĩa (semantic segmentation) ở mức điểm ảnh (pixel-level), trong đó mỗi điểm ảnh trong ảnh được phân loại thành hai lớp:
 
-- **Tiền cảnh (polyp)**: Điểm ảnh thuộc vùng polyp (giá trị 1)
-- **Nền**: Điểm ảnh không thuộc vùng polyp (giá trị 0)
+- **Tiền cảnh (foreground/polyp)**: Điểm ảnh thuộc vùng polyp (giá trị 1)
+- **Nền (background)**: Điểm ảnh không thuộc vùng polyp (giá trị 0)
 
 ![HÌNH MINH HỌA 1.1: Ví dụ về bài toán phân đoạn polyp đại tràng](1_polyp.png)
 
 ### 1.2 Thách Thức Kỹ Thuật
 
-**Biến đổi hình dạng và kích thước**: Polyp có thể có nhiều hình dạng, kích thước và màu sắc khác nhau, từ những nốt nhỏ đến khối u lớn.
+**Biến đổi hình dạng và kích thước (shape and size variations)**: Polyp có thể có nhiều hình dạng, kích thước và màu sắc khác nhau, từ những nốt nhỏ đến khối u lớn.
 
-**Độ tương phản thấp**: Sự khác biệt về màu sắc và độ sáng giữa polyp và mô xung quanh thường rất nhỏ.
+**Độ tương phản thấp (low contrast)**: Sự khác biệt về màu sắc và độ sáng giữa polyp và mô xung quanh thường rất nhỏ.
 
-**Tạo phẩm và nhiễu**: Hình ảnh nội soi thường chứa phản xạ ánh sáng, bóng, và các tạo phẩm khác.
+**Tạo phẩm và nhiễu (artifacts and noise)**: Hình ảnh nội soi thường chứa phản xạ ánh sáng (specular reflections), bóng (shadows), và các tạo phẩm khác.
 
-**Mất cân bằng lớp**: Vùng polyp thường chiếm tỷ lệ rất nhỏ so với nền, gây khó khăn cho việc huấn luyện.
+**Mất cân bằng lớp (class imbalance)**: Vùng polyp thường chiếm tỷ lệ rất nhỏ so với nền, gây khó khăn cho việc huấn luyện.
 
 ## 2. Kiến Trúc Tổng Thể ColonFormer
 
-### 2.1 Thiết Kế Mã Hóa-Giải Mã
+### 2.1 Thiết Kế Mã Hóa-Giải Mã (Encoder-Decoder Architecture)
 
-ColonFormer sử dụng kiến trúc mã hóa-giải mã với các thành phần chính:
+ColonFormer sử dụng kiến trúc mã hóa-giải mã (encoder-decoder) với các thành phần chính:
 
 ```
 Ảnh Đầu Vào (H×W×3)
@@ -47,86 +47,86 @@ ColonFormer sử dụng kiến trúc mã hóa-giải mã với các thành phầ
 
 ![HÌNH MINH HỌA 2.1: Sơ đồ kiến trúc tổng thể ColonFormer - luồng từ đầu vào qua bộ mã hóa MiT, đặc trưng đa tỷ lệ, bộ giải mã UPerHead đến đầu ra cuối cùng](2_1.png)
 
-### 2.2 Luồng Xử Lý Dữ Liệu
+### 2.2 Luồng Xử Lý Dữ Liệu (Data Processing Pipeline)
 
-**Tiền Xử Lý Đầu Vào**:
+**Tiền Xử Lý Đầu Vào (Input Preprocessing)**:
 
 - Thay đổi kích thước ảnh về 352×352 điểm ảnh
 - Chuẩn hóa theo tiêu chuẩn ImageNet
-- Tăng cường dữ liệu (xoay, lật, điều chỉnh màu sắc)
+- Tăng cường dữ liệu (data augmentation): xoay, lật, điều chỉnh màu sắc
 
-**Trích Xuất Đặc Trưng**:
+**Trích Xuất Đặc Trưng (Feature Extraction)**:
 
-- Bộ khung Mix Transformer trích xuất đặc trưng ở 4 tỷ lệ khác nhau
-- Mỗi tỷ lệ nắm bắt thông tin ở độ phân giải và trường tiếp nhận khác nhau
+- Bộ khung Mix Transformer (MiT backbone) trích xuất đặc trưng ở 4 tỷ lệ khác nhau
+- Mỗi tỷ lệ nắm bắt thông tin ở độ phân giải (resolution) và trường tiếp nhận (receptive field) khác nhau
 
-**Kết Hợp Đặc Trưng**:
+**Kết Hợp Đặc Trưng (Feature Fusion)**:
 
-- Bộ giải mã UPerHead kết hợp đặc trưng đa tỷ lệ
-- Tăng mẫu và tinh chỉnh để tạo bản đồ phân đoạn
+- Bộ giải mã UPerHead kết hợp đặc trưng đa tỷ lệ (multi-scale features)
+- Tăng mẫu (upsampling) và tinh chỉnh để tạo bản đồ phân đoạn (segmentation map)
 
 ## 3. Bộ Khung Mix Transformer (MiT)
 
 ### 3.1 Lý Thuyết Vision Transformer
 
-Vision Transformer thay thế các phép toán tích chập bằng cơ chế tự chú ý:
+Vision Transformer thay thế các phép toán tích chập (convolution) bằng cơ chế tự chú ý (self-attention):
 
-**Công Thức Tự Chú Ý**:
+**Công Thức Tự Chú Ý (Self-Attention Formula)**:
 
-```
-Attention(Q,K,V) = softmax(QK^T/√d_k)V
-```
+$$
+\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right) V
+$$
 
 Trong đó:
 
-- Q (Truy vấn): Đại diện cho vị trí hiện tại cần tính chú ý
-- K (Khóa): Đại diện cho tất cả vị trí trong bản đồ đặc trưng
-- V (Giá trị): Chứa thông tin nội dung tại mỗi vị trí
+- Q (Query/Truy vấn): Đại diện cho vị trí hiện tại cần tính chú ý
+- K (Key/Khóa): Đại diện cho tất cả vị trí trong bản đồ đặc trưng
+- V (Value/Giá trị): Chứa thông tin nội dung tại mỗi vị trí
 - d_k: Chiều của vector khóa (để chuẩn hóa)
 
 _[HÌNH MINH HỌA 3.1: Minh họa cơ chế Self-Attention trong Vision Transformer - ma trận Q, K, V và quá trình tính toán attention]_
 
-### 3.2 Cấu Trúc Phân Cấp
+### 3.2 Cấu Trúc Phân Cấp (Hierarchical Structure)
 
 MiT-B3 có cấu trúc phân cấp với 4 giai đoạn:
 
-**Giai Đoạn 1**:
+**Giai Đoạn 1 (Stage 1)**:
 
 - Đầu vào: 352×352×3
-- Kích thước miếng: 7×7, bước: 4
+- Kích thước miếng (patch size): 7×7, bước (stride): 4
 - Đầu ra: 88×88×64
 - Lớp Transformer: 3
 
-**Giai Đoạn 2**:
+**Giai Đoạn 2 (Stage 2)**:
 
 - Đầu vào: 88×88×64
-- Kích thước miếng: 3×3, bước: 2
+- Kích thước miếng (patch size): 3×3, bước (stride): 2
 - Đầu ra: 44×44×128
 - Lớp Transformer: 4
 
-**Giai Đoạn 3**:
+**Giai Đoạn 3 (Stage 3)**:
 
 - Đầu vào: 44×44×128
-- Kích thước miếng: 3×3, bước: 2
+- Kích thước miếng (patch size): 3×3, bước (stride): 2
 - Đầu ra: 22×22×320
 - Lớp Transformer: 6
 
-**Giai Đoạn 4**:
+**Giai Đoạn 4 (Stage 4)**:
 
 - Đầu vào: 22×22×320
-- Kích thước miếng: 3×3, bước: 2
+- Kích thước miếng (patch size): 3×3, bước (stride): 2
 - Đầu ra: 11×11×512
 - Lớp Transformer: 3
 
 _[HÌNH MINH HỌA 3.2: Cấu trúc phân cấp MiT-B3 với 4 giai đoạn - thể hiện sự thay đổi kích thước và số lượng kênh qua từng giai đoạn]_
 
-### 3.3 Gộp Miếng Chồng Lấp
+### 3.3 Gộp Miếng Chồng Lấp (Overlapped Patch Merging)
 
-Thay vì sử dụng miếng không chồng lấp như ViT gốc, MiT sử dụng miếng chồng lấp:
+Thay vì sử dụng miếng không chồng lấp (non-overlapping patches) như ViT gốc, MiT sử dụng miếng chồng lấp (overlapped patches):
 
 **Ưu điểm**:
 
-- Bảo toàn thông tin địa phương không gian
+- Bảo toàn thông tin địa phương không gian (spatial locality)
 - Giảm thiểu mất mát thông tin ở ranh giới
 - Tăng độ mượt của chuyển tiếp đặc trưng
 
@@ -144,11 +144,11 @@ self.patch_embed = nn.Conv2d(
 
 _[HÌNH MINH HỌA 3.3: So sánh giữa non-overlapping patches và overlapped patches - minh họa cách overlapped patches bảo toàn thông tin ranh giới tốt hơn]_
 
-### 3.4 Tự Chú Ý Hiệu Quả
+### 3.4 Tự Chú Ý Hiệu Quả (Efficient Self-Attention)
 
-MiT sử dụng phép toán giảm để giảm độ phức tạp tính toán:
+MiT sử dụng phép toán giảm (reduction operation) để giảm độ phức tạp tính toán:
 
-**Chú Ý Giảm Không Gian (SRA)**:
+**Chú Ý Giảm Không Gian (Spatial Reduction Attention - SRA)**:
 
 ```python
 # Giảm chiều không gian của K và V
@@ -160,7 +160,7 @@ if self.sr_ratio > 1:
     k, v = kv[0], kv[1]
 ```
 
-**Phân Tích Độ Phức Tạp**:
+**Phân Tích Độ Phức Tạp (Complexity Analysis)**:
 
 - Chú ý gốc: O(N²) với N = H×W
 - Chú ý SRA: O(N²/r²) với r = tỷ lệ giảm
@@ -170,11 +170,11 @@ _[HÌNH MINH HỌA 3.4: Minh họa Spatial Reduction Attention (SRA) - so sánh 
 
 ## 4. Bộ Giải Mã UPerHead
 
-### 4.1 Khái Niệm Mạng Kim Tự Tháp Đặc Trưng
+### 4.1 Khái Niệm Mạng Kim Tự Tháp Đặc Trưng (Feature Pyramid Network)
 
-UPerHead dựa trên ý tưởng Mạng Kim Tự Tháp Đặc Trưng (FPN) để kết hợp đặc trưng đa tỷ lệ:
+UPerHead dựa trên ý tưởng Mạng Kim Tự Tháp Đặc Trưng (Feature Pyramid Network - FPN) để kết hợp đặc trưng đa tỷ lệ:
 
-**Đường dẫn từ trên xuống**:
+**Đường dẫn từ trên xuống (Top-down pathway)**:
 
 - Bắt đầu từ bản đồ đặc trưng độ phân giải thấp nhất (ngữ nghĩa phong phú nhất)
 - Tăng mẫu và kết hợp với đặc trưng từ các lớp thấp hơn
@@ -182,11 +182,11 @@ UPerHead dựa trên ý tưởng Mạng Kim Tự Tháp Đặc Trưng (FPN) để
 
 _[HÌNH MINH HỌA 4.1: Sơ đồ Feature Pyramid Network - đường dẫn từ trên xuống và lateral connections]_
 
-### 4.2 Mô-đun Gộp Kim Tự Tháp (PPM)
+### 4.2 Mô-đun Gộp Kim Tự Tháp (Pyramid Pooling Module - PPM)
 
-PPM nắm bắt ngữ cảnh toàn cục thông qua gộp đa tỷ lệ:
+PPM nắm bắt ngữ cảnh toàn cục (global context) thông qua gộp đa tỷ lệ (multi-scale pooling):
 
-**Tỷ Lệ Gộp**: [1×1, 2×2, 3×3, 6×6]
+**Tỷ Lệ Gộp (Pooling Scales)**: [1×1, 2×2, 3×3, 6×6]
 
 **Cài Đặt**:
 
@@ -216,37 +216,37 @@ class PPM(nn.Module):
 
 _[HÌNH MINH HỌA 4.2: Pyramid Pooling Module với các tỷ lệ pooling khác nhau - 1×1, 2×2, 3×3, 6×6]_
 
-### 4.3 Chiến Lược Kết Hợp Đặc Trưng
+### 4.3 Chiến Lược Kết Hợp Đặc Trưng (Feature Fusion Strategy)
 
-**Kết nối bên**: Kết nối trực tiếp giữa đặc trưng bộ mã hóa và giải mã
+**Kết nối bên (Lateral connections)**: Kết nối trực tiếp giữa đặc trưng bộ mã hóa và giải mã
 
-**Căn chỉnh đặc trưng**: Đảm bảo chiều không gian nhất quán thông qua nội suy
+**Căn chỉnh đặc trưng (Feature alignment)**: Đảm bảo chiều không gian nhất quán thông qua nội suy (interpolation)
 
-**Chú ý kênh**: Trọng số đặc trưng có chọn lọc dựa trên tầm quan trọng
+**Chú ý kênh (Channel attention)**: Trọng số đặc trưng có chọn lọc dựa trên tầm quan trọng
 
-## 5. Hàm Mất Mát: Phân Tích Mất Mát Cấu Trúc
+## 5. Hàm Mất Mát: Phân Tích Mất Mát Cấu Trúc (Structure Loss)
 
-### 5.1 Thành Phần Mất Mát Focal
+### 5.1 Thành Phần Mất Mát Focal (Focal Loss Component)
 
-Mất Mát Focal được thiết kế để giải quyết vấn đề mất cân bằng lớp:
+Mất Mát Focal (Focal Loss) được thiết kế để giải quyết vấn đề mất cân bằng lớp (class imbalance):
 
 **Công Thức Toán Học**:
 
-```
-FL(p_t) = -α_t(1-p_t)^γ log(p_t)
-```
+$$
+FL(p_t) = -\alpha_t (1 - p_t)^\gamma \log(p_t)
+$$
 
 Trong đó:
 
-- p_t: xác suất dự đoán của lớp đúng
-- α_t: hệ số trọng số cho lớp t
-- γ: tham số tập trung
+- $p_t$: xác suất dự đoán của lớp đúng
+- $\alpha_t$: hệ số trọng số cho lớp t
+- $\gamma$: tham số tập trung (focusing parameter)
 
 **Trực Giác**:
 
-- Khi p_t cao (ví dụ dễ): (1-p_t)^γ nhỏ → mất mát nhỏ
-- Khi p_t thấp (ví dụ khó): (1-p_t)^γ lớn → mất mát lớn
-- γ=2 là giá trị thường dùng trong thực tế
+- Khi $p_t$ cao (ví dụ dễ/easy examples): $(1-p_t)^\gamma$ nhỏ → mất mát nhỏ
+- Khi $p_t$ thấp (ví dụ khó/hard examples): $(1-p_t)^\gamma$ lớn → mất mát lớn
+- $\gamma=2$ là giá trị thường dùng trong thực tế
 
 _[HÌNH MINH HỌA 5.1: Biểu đồ Focal Loss - so sánh giữa Cross Entropy Loss và Focal Loss, thể hiện cách Focal Loss tập trung vào hard examples]_
 
@@ -276,17 +276,17 @@ class FocalLossV1(nn.Module):
         return focal_loss.mean() if self.reduction == 'mean' else focal_loss
 ```
 
-### 5.2 Thành Phần Mất Mát IoU Có Trọng Số
+### 5.2 Thành Phần Mất Mát IoU Có Trọng Số (Weighted IoU Loss Component)
 
-Mất Mát IoU đánh giá độ chồng lấp giữa dự đoán và nhãn thật:
+Mất Mát IoU (IoU Loss) đánh giá độ chồng lấp (overlap) giữa dự đoán và nhãn thật (ground truth):
 
-**IoU Chuẩn**:
+**IoU Chuẩn (Standard IoU)**:
 
-```
-IoU = |A ∩ B| / |A ∪ B|
-```
+$$
+\text{IoU} = \frac{|A \cap B|}{|A \cup B|}
+$$
 
-**IoU Có Trọng Số với tầm quan trọng không gian**:
+**IoU Có Trọng Số với tầm quan trọng không gian (Spatial-weighted IoU)**:
 
 ```python
 def weighted_iou_loss(pred, mask):
@@ -303,23 +303,23 @@ def weighted_iou_loss(pred, mask):
     return wiou.mean()
 ```
 
-**Nhấn Mạnh Ranh Giới**:
+**Nhấn Mạnh Ranh Giới (Boundary Emphasis)**:
 
-- avg_pool2d tạo phiên bản mượt của mặt nạ
+- `avg_pool2d` tạo phiên bản mượt của mặt nạ
 - Sự khác biệt với mặt nạ gốc làm nổi bật ranh giới
 - Hệ số nhân "5" tăng cường tầm quan trọng của vùng ranh giới
 
 _[HÌNH MINH HỌA 5.2: Minh họa Weighted IoU Loss - thể hiện cách spatial weighting nhấn mạnh vùng ranh giới]_
 
-### 5.3 Mất Mát Cấu Trúc Kết Hợp
+### 5.3 Mất Mát Cấu Trúc Kết Hợp (Combined Structure Loss)
 
 **Công Thức Mất Mát Cuối Cùng**:
 
-```
-L_tổng = L_focal + L_wiou
-```
+$$
+L_{\text{total}} = L_{\text{focal}} + L_{\text{wiou}}
+$$
 
-**Giám Sát Đa Tỷ Lệ**:
+**Giám Sát Đa Tỷ Lệ (Multi-scale Supervision)**:
 
 ```python
 loss = structure_loss(map1, gts) + structure_loss(map2, gts) + \
@@ -329,16 +329,16 @@ loss = structure_loss(map1, gts) + structure_loss(map2, gts) + \
 **Lý Do**:
 
 - Giám sát đa tỷ lệ giúp mạng học đặc trưng ở nhiều mức
-- Giám sát sâu cải thiện dòng gradient
+- Giám sát sâu (deep supervision) cải thiện dòng gradient
 - Mỗi tỷ lệ đóng góp vào hiệu suất cuối cùng
 
 _[HÌNH MINH HỌA 5.3: Sơ đồ Multi-scale Supervision - thể hiện 4 đầu ra ở các tỷ lệ khác nhau và cách tính loss]_
 
-## 6. Chiến Lược Huấn Luyện và Tối Ưu Hóa
+## 6. Chiến Lược Huấn Luyện và Tối Ưu Hóa (Training Strategy and Optimization)
 
-### 6.1 Huấn Luyện Đa Tỷ Lệ
+### 6.1 Huấn Luyện Đa Tỷ Lệ (Multi-scale Training)
 
-**Hệ Số Tỷ Lệ**: [0.75, 1.0, 1.25]
+**Hệ Số Tỷ Lệ (Scale Factors)**: [0.75, 1.0, 1.25]
 
 **Cài Đặt**:
 
@@ -359,15 +359,15 @@ for rate in size_rates:
 
 **Lợi Ích**:
 
-- Cải thiện tính bất biến tỷ lệ
+- Cải thiện tính bất biến tỷ lệ (scale invariance)
 - Khái quát hóa tốt hơn cho các kích thước polyp khác nhau
 - Học đặc trưng mạnh mẽ qua các tỷ lệ
 
 _[HÌNH MINH HỌA 6.1: Multi-scale Training - thể hiện cách training với 3 tỷ lệ khác nhau để tăng tính robust]_
 
-### 6.2 Lập Lịch Tốc Độ Học
+### 6.2 Lập Lịch Tốc Độ Học (Learning Rate Scheduling)
 
-**Chiến Lược Khởi Động**:
+**Chiến Lược Khởi Động (Warm-up Strategy)**:
 
 ```python
 if epoch <= 1:
@@ -376,7 +376,7 @@ else:
     lr_scheduler.step()
 ```
 
-**Ủ Cosine**:
+**Ủ Cosine (Cosine Annealing)**:
 
 ```python
 lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
@@ -388,13 +388,13 @@ lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
 
 **Lý Do**:
 
-- Khởi động ngăn chặn quá khớp sớm với tốc độ học lớn
+- Khởi động ngăn chặn quá khớp sớm (early overfitting) với tốc độ học lớn
 - Ủ cosine cung cấp sự suy giảm tốc độ học mượt mà
 - Tốc độ học cuối = tốc độ học ban đầu / 1000 để tinh chỉnh cuối
 
 _[HÌNH MINH HỌA 6.2: Biểu đồ Learning Rate Schedule - warm-up và cosine annealing qua các epochs]_
 
-### 6.3 Cắt Gradient
+### 6.3 Cắt Gradient (Gradient Clipping)
 
 **Cài Đặt**:
 
@@ -408,24 +408,24 @@ def clip_gradient(optimizer, grad_clip):
 
 **Mục Đích**:
 
-- Ngăn chặn gradient bùng nổ trong mạng sâu
+- Ngăn chặn gradient bùng nổ (gradient explosion) trong mạng sâu
 - Ổn định quá trình huấn luyện
 - Giá trị cắt = 0.5 hoạt động tốt theo kinh nghiệm
 
-## 7. Phân Tích Sâu Các Thước Đo Đánh Giá
+## 7. Phân Tích Sâu Các Thước Đo Đánh Giá (Evaluation Metrics Analysis)
 
-### 7.1 Hệ Số Dice
+### 7.1 Hệ Số Dice (Dice Coefficient)
 
 **Định Nghĩa Toán Học**:
 
-```
-Dice = 2|A ∩ B| / (|A| + |B|)
-```
+$$
+\text{Dice} = \frac{2|A \cap B|}{|A| + |B|}
+$$
 
 **Đặc Điểm**:
 
 - Phạm vi: [0, 1], càng cao càng tốt
-- Diễn giải hình học: thước đo chồng lấp
+- Diễn giải hình học: thước đo chồng lấp (overlap measure)
 - Nhạy cảm với đối tượng nhỏ (tốt cho hình ảnh y tế)
 
 **Cài Đặt Code**:
@@ -437,140 +437,152 @@ def dice_np(y_true, y_pred):
     return dice
 ```
 
-### 7.2 Giao của Hợp (IoU)
+### 7.2 Giao của Hợp (Intersection over Union - IoU)
 
 **Định Nghĩa Toán Học**:
 
-```
-IoU = |A ∩ B| / |A ∪ B|
-```
+$$
+\text{IoU} = \frac{|A \cap B|}{|A \cup B|}
+$$
 
 **Mối Quan Hệ với Dice**:
 
-```
-Dice = 2×IoU / (1 + IoU)
-IoU = Dice / (2 - Dice)
-```
+$$
+\text{Dice} = \frac{2 \times \text{IoU}}{1 + \text{IoU}}
+$$
+
+$$
+\text{IoU} = \frac{\text{Dice}}{2 - \text{Dice}}
+$$
 
 **Tính Chất**:
 
 - Nghiêm ngặt hơn hệ số Dice
-- Phạt đồng đều dương tính giả và âm tính giả
+- Phạt đồng đều dương tính giả (false positives) và âm tính giả (false negatives)
 - Thước đo chuẩn cho phát hiện/phân đoạn đối tượng
 
 _[HÌNH MINH HỌA 7.1: So sánh các thước đo Dice, IoU, Precision, Recall - minh họa hình học và ý nghĩa]_
 
-### 7.3 Độ Chính Xác và Độ Nhạy
+### 7.3 Độ Chính Xác và Độ Nhạy (Precision and Recall)
 
-**Độ Chính Xác (Giá Trị Dự Đoán Dương)**:
+**Độ Chính Xác (Precision - Positive Predictive Value)**:
 
-```
-Precision = TP / (TP + FP)
-```
+$$
+\text{Precision} = \frac{TP}{TP + FP}
+$$
 
-**Độ Nhạy (Tỷ Lệ Dương Tính Thật)**:
+**Độ Nhạy (Recall - True Positive Rate)**:
 
-```
-Recall = TP / (TP + FN)
-```
+$$
+\text{Recall} = \frac{TP}{TP + FN}
+$$
 
-**Diễn Giải Lâm Sàng**:
+**Diễn Giải Lâm Sàng (Clinical Interpretation)**:
 
-- **Độ Chính Xác Cao**: Ít báo động giả, bác sĩ tin tưởng dự đoán
-- **Độ Nhạy Cao**: Ít bỏ sót polyp, quan trọng cho phát hiện sớm
+- **Độ Chính Xác Cao**: Ít báo động giả (false alarms), bác sĩ tin tưởng dự đoán
+- **Độ Nhạy Cao**: Ít bỏ sót polyp, quan trọng cho phát hiện sớm (early detection)
 - **Cân Bằng**: Cần cân bằng giữa độ chính xác và độ nhạy
 
 _[HÌNH MINH HỌA 7.2: Ma trận confusion và các thước đo precision/recall trong bối cảnh y tế]_
 
-### 7.4 Phân Tích Trung Bình Điều Hòa
+### 7.4 Phân Tích Trung Bình Điều Hòa (Harmonic Mean Analysis)
 
-Hệ số Dice là trung bình điều hòa của độ chính xác và độ nhạy:
+Hệ số Dice là trung bình điều hòa (harmonic mean) của độ chính xác và độ nhạy:
 
 **Chứng Minh**:
 
-```
-Dice = 2×TP / (2×TP + FP + FN)
-     = 2 / (2×TP/(2×TP + FP + FN) + (2×TP + FP + FN)/(2×TP))
-     = 2 / (1/Precision + 1/Recall)
-     = Trung Bình Điều Hòa(Precision, Recall)
-```
+$$
+\text{Dice} = \frac{2 \times TP}{2 \times TP + FP + FN}
+$$
 
-## 8. Chiến Lược Tăng Cường Dữ Liệu
+$$
+= \frac{2}{\frac{2 \times TP + FP + FN}{2 \times TP}}
+$$
 
-### 8.1 Biến Đổi Không Gian
+$$
+= \frac{2}{\frac{1}{\text{Precision}} + \frac{1}{\text{Recall}}}
+$$
 
-**Xoay**: Xoay ngẫu nhiên trong [-15°, +15°]
+$$
+= \text{Harmonic Mean}(\text{Precision}, \text{Recall})
+$$
+
+## 8. Chiến Lược Tăng Cường Dữ Liệu (Data Augmentation Strategy)
+
+### 8.1 Biến Đổi Không Gian (Spatial Transformations)
+
+**Xoay (Rotation)**: Xoay ngẫu nhiên trong [-15°, +15°]
 
 - Mô phỏng các góc nhìn khác nhau trong nội soi
 - Bảo toàn đặc điểm polyp
 
-**Lật Ngang/Dọc**:
+**Lật Ngang/Dọc (Horizontal/Vertical Flipping)**:
 
 - Xác suất = 0.5 cho mỗi hướng
 - Khai thác tính đối xứng trong cấu trúc đại tràng
 
-**Tỷ Lệ và Cắt**:
+**Tỷ Lệ và Cắt (Scaling and Cropping)**:
 
 - Tỷ lệ ngẫu nhiên [0.8, 1.2]
 - Cắt trung tâm về kích thước mục tiêu
-- Duy trì tỷ lệ khung hình
+- Duy trì tỷ lệ khung hình (aspect ratio)
 
-### 8.2 Biến Đổi Quang Học
+### 8.2 Biến Đổi Quang Học (Photometric Transformations)
 
-**Điều Chỉnh Độ Sáng**:
+**Điều Chỉnh Độ Sáng (Brightness Adjustment)**:
 
 - Phạm vi: [-0.2, +0.2]
 - Mô phỏng biến đổi ánh sáng trong nội soi
 
-**Tăng Cường Độ Tương Phản**:
+**Tăng Cường Độ Tương Phản (Contrast Enhancement)**:
 
 - Hệ số phạm vi: [0.8, 1.2]
 - Cải thiện phân biệt polyp-nền
 
-**Điều Chỉnh Màu Sắc**:
+**Điều Chỉnh Màu Sắc (Color Adjustment)**:
 
-- Sắc độ: ±10°
-- Độ bão hòa: ±20%
+- Sắc độ (Hue): ±10°
+- Độ bão hòa (Saturation): ±20%
 - Tính đến biến đổi camera
 
-**Nhiễu Gauss**:
+**Nhiễu Gauss (Gaussian Noise)**:
 
 - σ = 0.01
-- Mô phỏng nhiễu cảm biến
+- Mô phỏng nhiễu cảm biến (sensor noise)
 
 _[HÌNH MINH HỌA 8.1: Tổng hợp các phép biến đổi không gian và quang học - rotation, flip, scaling, brightness, contrast]_
 
-### 8.3 Tăng Cường Đặc Thù Y Tế
+### 8.3 Tăng Cường Đặc Thù Y Tế (Medical-specific Augmentations)
 
-**Biến Dạng Đàn Hồi**:
+**Biến Dạng Đàn Hồi (Elastic Deformation)**:
 
-- Mô phỏng biến dạng mô
+- Mô phỏng biến dạng mô (tissue deformation)
 - Tham số: α=50, σ=5
 
-**Mờ Chuyển Động**:
+**Mờ Chuyển Động (Motion Blur)**:
 
 - Kích thước kernel: 3-7 điểm ảnh
 - Mô phỏng chuyển động camera
 
-**Mô Phỏng Phản Xạ Gương**:
+**Mô Phỏng Phản Xạ Gương (Specular Reflection Simulation)**:
 
 - Điểm sáng ngẫu nhiên
-- Bắt chước tạo phẩm ánh sáng nội soi
+- Bắt chước tạo phẩm ánh sáng nội soi (endoscopic light artifacts)
 
-\_[HÌNH MINH HỌA 8.2: Medical-specific augmentations - elastic deformation, motion blur, specular reflection]\*
+_[HÌNH MINH HỌA 8.2: Medical-specific augmentations - elastic deformation, motion blur, specular reflection]_
 
-## 9. Chi Tiết Triển Khai
+## 9. Chi Tiết Triển Khai (Implementation Details)
 
-### 9.1 Tối Ưu Hóa Bộ Nhớ
+### 9.1 Tối Ưu Hóa Bộ Nhớ (Memory Optimization)
 
-**Điểm Kiểm Tra Gradient**:
+**Điểm Kiểm Tra Gradient (Gradient Checkpointing)**:
 
 ```python
 # Bật gradient checkpointing cho hiệu quả bộ nhớ
 model.backbone.use_checkpoint = True
 ```
 
-**Huấn Luyện Độ Chính Xác Hỗn Hợp**:
+**Huấn Luyện Độ Chính Xác Hỗn Hợp (Mixed Precision Training)**:
 
 ```python
 from torch.cuda.amp import autocast, GradScaler
@@ -586,15 +598,15 @@ scaler.step(optimizer)
 scaler.update()
 ```
 
-### 9.2 Chiến Lược Xử Lý Lô
+### 9.2 Chiến Lược Xử Lý Lô (Batch Processing Strategy)
 
-**Kích Thước Lô Động**:
+**Kích Thước Lô Động (Dynamic Batch Size)**:
 
 - Bắt đầu với kích thước lô lớn
-- Giảm nếu xảy ra hết bộ nhớ (OOM)
+- Giảm nếu xảy ra hết bộ nhớ (Out of Memory - OOM)
 - Giám sát sử dụng bộ nhớ GPU
 
-**Chiến Lược Tích Lũy**:
+**Chiến Lược Tích Lũy (Gradient Accumulation Strategy)**:
 
 ```python
 accumulation_steps = 4
@@ -607,9 +619,9 @@ for i, batch in enumerate(dataloader):
         optimizer.zero_grad()
 ```
 
-### 9.3 Quản Lý Điểm Kiểm Tra
+### 9.3 Quản Lý Điểm Kiểm Tra (Checkpoint Management)
 
-**Lưu Mô Hình Tốt Nhất**:
+**Lưu Mô Hình Tốt Nhất (Best Model Saving)**:
 
 ```python
 if current_dice > best_dice:
@@ -623,7 +635,7 @@ if current_dice > best_dice:
     }, 'best_model.pth')
 ```
 
-**Tiếp Tục Huấn Luyện**:
+**Tiếp Tục Huấn Luyện (Resume Training)**:
 
 ```python
 if resume_path:
@@ -633,11 +645,11 @@ if resume_path:
     start_epoch = checkpoint['epoch']
 ```
 
-## 10. Phân Tích Nâng Cao và Khả Năng Diễn Giải
+## 10. Phân Tích Nâng Cao và Khả Năng Diễn Giải (Advanced Analysis and Interpretability)
 
-### 10.1 Trực Quan Hóa Chú Ý
+### 10.1 Trực Quan Hóa Chú Ý (Attention Visualization)
 
-**Trích Xuất Bản Đồ Chú Ý**:
+**Trích Xuất Bản Đồ Chú Ý (Attention Map Extraction)**:
 
 ```python
 def get_attention_maps(model, input_image):
@@ -663,11 +675,11 @@ def get_attention_maps(model, input_image):
     return attention_maps
 ```
 
-**Trực Quan Hóa**:
+**Trực Quan Hóa (Visualization)**:
 
 ```python
 def visualize_attention(attention_map, input_image):
-    # Trung bình qua các đầu chú ý
+    # Trung bình qua các đầu chú ý (attention heads)
     avg_attention = attention_map.mean(dim=1)
 
     # Định hình lại thành chiều không gian
@@ -684,9 +696,9 @@ def visualize_attention(attention_map, input_image):
 
 _[HÌNH MINH HỌA 10.1: Attention Visualization - heatmaps thể hiện vùng mà model tập trung chú ý khi phân đoạn polyp]_
 
-### 10.2 Phân Tích Bản Đồ Đặc Trưng
+### 10.2 Phân Tích Bản Đồ Đặc Trưng (Feature Map Analysis)
 
-**Trực Quan Hóa Đặc Trưng Đa Tỷ Lệ**:
+**Trực Quan Hóa Đặc Trưng Đa Tỷ Lệ (Multi-scale Feature Visualization)**:
 
 ```python
 def analyze_multiscale_features(model, input_image):
@@ -709,7 +721,7 @@ def analyze_multiscale_features(model, input_image):
     return features
 ```
 
-### 10.3 Giải Thích Dựa Trên Gradient
+### 10.3 Giải Thích Dựa Trên Gradient (Gradient-based Explanation)
 
 **Cài Đặt Grad-CAM**:
 
@@ -753,11 +765,11 @@ class GradCAM:
 
 _[HÌNH MINH HỌA 10.2: Grad-CAM visualization - thể hiện vùng quan trọng mà model sử dụng để đưa ra quyết định]_
 
-## 11. Phân Tích Hiệu Suất và Đánh Giá So Sánh
+## 11. Phân Tích Hiệu Suất và Đánh Giá So Sánh (Performance Analysis and Comparative Evaluation)
 
-### 11.1 Độ Phức Tạp Tính Toán
+### 11.1 Độ Phức Tạp Tính Toán (Computational Complexity)
 
-**Phân Tích FLOPs**:
+**Phân Tích FLOPs (FLOPs Analysis)**:
 
 ```python
 from thop import profile
@@ -772,7 +784,7 @@ def analyze_complexity(model, input_size=(1, 3, 352, 352)):
     return flops, params
 ```
 
-**Phân Tích Sử Dụng Bộ Nhớ**:
+**Phân Tích Sử Dụng Bộ Nhớ (Memory Usage Analysis)**:
 
 ```python
 import torch.profiler
@@ -796,9 +808,9 @@ def profile_memory_usage(model, dataloader):
     print(prof.key_averages().table(sort_by="cuda_memory_usage", row_limit=10))
 ```
 
-### 11.2 Tối Ưu Hóa Tốc Độ Suy Luận
+### 11.2 Tối Ưu Hóa Tốc Độ Suy Luận (Inference Speed Optimization)
 
-**Tối Ưu Hóa TensorRT**:
+**Tối Ưu Hóa TensorRT (TensorRT Optimization)**:
 
 ```python
 import torch_tensorrt
@@ -821,7 +833,7 @@ def optimize_with_tensorrt(model, example_input):
     return trt_model
 ```
 
-**Xuất ONNX**:
+**Xuất ONNX (ONNX Export)**:
 
 ```python
 def export_to_onnx(model, example_input, output_path):
@@ -842,67 +854,67 @@ def export_to_onnx(model, example_input, output_path):
     )
 ```
 
-## 12. Cân Nhắc Trong Lĩnh Vực Y Tế
+## 12. Cân Nhắc Trong Lĩnh Vực Y Tế (Medical Domain Considerations)
 
-### 12.1 Giao Thức Xác Thực Lâm Sàng
+### 12.1 Giao Thức Xác Thực Lâm Sàng (Clinical Validation Protocol)
 
-**Xác Thực Liên Bệnh Viện**:
+**Xác Thực Liên Bệnh Viện (Multi-center Validation)**:
 
 - Huấn luyện trên dữ liệu từ bệnh viện A
 - Xác thực trên dữ liệu từ bệnh viện B, C
 - Đánh giá khả năng khái quát qua các thiết bị khác nhau
 
-**Giao Thức Chú Thích Chuyên Gia**:
+**Giao Thức Chú Thích Chuyên Gia (Expert Annotation Protocol)**:
 
 - Nhiều chú thích chuyên gia cho mỗi ảnh
 - Đo lường sự nhất quán giữa các người đánh giá (điểm Kappa)
-- Xây dựng đồng thuận cho nhãn thật
+- Xây dựng đồng thuận cho nhãn thật (ground truth)
 
-**Thước Đo Lâm Sàng**:
+**Thước Đo Lâm Sàng (Clinical Metrics)**:
 
-- **Độ Nhạy**: Quan trọng cho ứng dụng sàng lọc
-- **Độ Đặc Hiệu**: Quan trọng để tránh báo động giả
+- **Độ Nhạy (Sensitivity)**: Quan trọng cho ứng dụng sàng lọc
+- **Độ Đặc Hiệu (Specificity)**: Quan trọng để tránh báo động giả
 - **PPV/NPV**: Ý nghĩa lâm sàng thực tế
 
-### 12.2 Cân Nhắc Quy Định
+### 12.2 Cân Nhắc Quy Định (Regulatory Considerations)
 
-**Hướng Dẫn FDA**:
+**Hướng Dẫn FDA (FDA Guidelines)**:
 
-- Phân loại Phần Mềm như Thiết Bị Y Tế (SaMD)
+- Phân loại Phần Mềm như Thiết Bị Y Tế (Software as Medical Device - SaMD)
 - Yêu cầu xác thực lâm sàng
 - Quản lý rủi ro (ISO 14971)
 
-**Quyền Riêng Tư Dữ Liệu**:
+**Quyền Riêng Tư Dữ Liệu (Data Privacy)**:
 
 - Tuân thủ HIPAA
 - Giao thức ẩn danh hóa
 - Xử lý dữ liệu an toàn
 
-**Yêu Cầu Bộ Dữ Liệu Xác Thực**:
+**Yêu Cầu Bộ Dữ Liệu Xác Thực (Validation Dataset Requirements)**:
 
 - Tối thiểu 500 trường hợp mỗi lớp
 - Nhân khẩu học bệnh nhân đa dạng
 - Nhiều điều kiện hình ảnh
 
-### 12.3 Tích Hợp với Quy Trình Lâm Sàng
+### 12.3 Tích Hợp với Quy Trình Lâm Sàng (Clinical Workflow Integration)
 
-**Xử Lý Thời Gian Thực**:
+**Xử Lý Thời Gian Thực (Real-time Processing)**:
 
 - Thời gian suy luận < 100ms mỗi khung hình
 - Sử dụng bộ nhớ < 2GB
 - Sử dụng CPU < 80%
 
-**Thiết Kế Giao Diện Người Dùng**:
+**Thiết Kế Giao Diện Người Dùng (User Interface Design)**:
 
-- Hiển thị điểm tin cậy
-- Định lượng độ không chắc chắn
+- Hiển thị điểm tin cậy (confidence scores)
+- Định lượng độ không chắc chắn (uncertainty quantification)
 - Sửa chữa dương tính giả dễ dàng
 
-**Đảm Bảo Chất Lượng**:
+**Đảm Bảo Chất Lượng (Quality Assurance)**:
 
 - Kiểm tra chất lượng tự động
-- Giám sát hiệu suất
-- Cơ chế học liên tục
+- Giám sát hiệu suất (performance monitoring)
+- Cơ chế học liên tục (continual learning)
 
 _[HÌNH MINH HỌA 12.1: Sơ đồ tích hợp ColonFormer vào quy trình lâm sàng - từ nhập ảnh đến hỗ trợ quyết định bác sĩ]_
 
@@ -924,7 +936,10 @@ Các hướng phát triển tiếp theo có thể bao gồm:
 
 - Tích hợp với xử lý video thời gian thực
 - Định lượng độ không chắc chắn để cung cấp thước đo tin cậy
-- Học ít mẫu để thích ứng với bệnh viện/thiết bị mới
-- Trí tuệ nhân tạo có thể giải thích để tăng niềm tin từ các bác sĩ
+- Học ít mẫu (few-shot learning) để thích ứng với bệnh viện/thiết bị mới
+- Trí tuệ nhân tạo có thể giải thích (explainable AI) để tăng niềm tin từ các bác sĩ
 
 Khung làm việc này không chỉ giải quyết vấn đề cụ thể mà còn cung cấp một nền tảng vững chắc cho các ứng dụng hình ảnh y tế khác, thể hiện sức mạnh của thiết kế kiến trúc chu đáo kết hợp với chuyên môn lĩnh vực.
+
+$$
+$$
