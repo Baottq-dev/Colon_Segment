@@ -10,6 +10,7 @@ opencv-python>=4.5.0
 albumentations>=1.3.0
 matplotlib>=3.3.0
 Pillow>=8.0.0
+seaborn
 
 # Utilities
 numpy==1.26.4 
