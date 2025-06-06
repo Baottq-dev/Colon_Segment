@@ -73,5 +73,80 @@
         "specificity": 0.9854223928293945
       }
     }
+  },
+  {
+    "timestamp": "2025-06-06 12:51:50",
+    "model_name": "ColonFormer-L",
+    "backbone": "b3",
+    "loss_type": "tversky",
+    "epochs": 8,
+    "batch_size": 16,
+    "weight_file": "snapshots\\ColonFormer-L_b3_20ep_16bs_tversky_20250605_2343_a0.7_b0.3\\last.pth",
+    "total_images": 798,
+    "total_params": 52944528,
+    "test_time": 383.4480803012848,
+    "overall_metrics": {
+      "dice": 0.4682517258602387,
+      "miou": 0.3624698523015406,
+      "precision": 0.39188565324023716,
+      "recall": 0.7830784653785119
+    },
+    "dataset_metrics": {
+      "Kvasir": {
+        "miou": 0.5392398526698716,
+        "dice": 0.6670907049515692,
+        "precision": 0.5594446747634074,
+        "recall": 0.9430982846134495,
+        "images": 100,
+        "accuracy": 0.9435076349424203,
+        "f1_score": 0.6670907049515692,
+        "sensitivity": 0.9430982846134495,
+        "specificity": 0.9464857170565321
+      },
+      "ETIS-LaribPolypDB": {
+        "miou": 0.4439744292146319,
+        "dice": 0.5742228658073958,
+        "precision": 0.4490012854705928,
+        "recall": 0.9341768129960768,
+        "images": 196,
+        "accuracy": 0.8985000484238618,
+        "f1_score": 0.5742228658073958,
+        "sensitivity": 0.9341768129960768,
+        "specificity": 0.8935796371690488
+      },
+      "CVC-ColonDB": {
+        "miou": 0.23938564107285573,
+        "dice": 0.323642945095858,
+        "precision": 0.28363213586911856,
+        "recall": 0.6351266303908156,
+        "images": 380,
+        "accuracy": 0.8283181886139466,
+        "f1_score": 0.323642945095858,
+        "sensitivity": 0.6351266303908156,
+        "specificity": 0.8459353523206107
+      },
+      "CVC-ClinicDB": {
+        "miou": 0.38935803393514273,
+        "dice": 0.4951026801542338,
+        "precision": 0.40671420377595763,
+        "recall": 0.8410565089153974,
+        "images": 62,
+        "accuracy": 0.8509756773186946,
+        "f1_score": 0.4951026801542338,
+        "sensitivity": 0.8410565089153974,
+        "specificity": 0.8498669091312393
+      },
+      "CVC-300": {
+        "miou": 0.5533537838651724,
+        "dice": 0.6787906622845908,
+        "precision": 0.596325659879298,
+        "recall": 0.8999084743701975,
+        "images": 60,
+        "accuracy": 0.8813339359497018,
+        "f1_score": 0.6787906622845908,
+        "sensitivity": 0.8999084743701975,
+        "specificity": 0.8824972550561738
+      }
+    }
   }
 ]
