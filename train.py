@@ -701,7 +701,7 @@ if __name__ == '__main__':
     parser.add_argument('--init_lr', type=float,
                         default=1e-4, help='learning rate')
     parser.add_argument('--batchsize', type=int,
-                        default=32, help='training batch size')
+                        default=16, help='training batch size')
     parser.add_argument('--init_trainsize', type=int,
                         default=352, help='training dataset size')
     parser.add_argument('--clip', type=float,

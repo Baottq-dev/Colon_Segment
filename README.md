@@ -1,20 +1,37 @@
 # ColonFormer: An Efficient Transformer-based Method for Colon Polyp Segmentation
 
-An implementation of ColonFormer - an efficient colon polyp segmentation method using Transformer architecture with enhanced logging, visualization, and evaluation capabilities.
+An implementation of ColonFormer - an efficient colon polyp segmentation method using Transformer architecture with enhanced logging, visualization, evaluation capabilities, and automated workflow system.
 
 **Note**: This is a modified version compatible with MMCV 2.2.0. The original repository and official paper can be found at [ducnt9907/ColonFormer](https://github.com/ducnt9907/ColonFormer).
 
 ## Key Features
 
-- **Mix Transformer (MiT) Backbone**: Support for MIT-B0 to MIT-B5 variants
-- **Context Feature Pyramid (CFP) Module**: Multi-scale dilated convolution features
+### Architecture Components
+
+- **Mix Transformer (MiT) Backbone**: Support for MIT-B1 to MIT-B5 variants
+- **Context Feature Pyramid (CFP) Module**: Multi-scale dilated convolution features (d=8)
 - **Axial Attention Mechanism**: Efficient axis-wise attention computation
-- **Reverse Attention**: Attention mechanism for focus refinement
-- **Multi-scale Output**: 4 feature maps at different resolutions
-- **Advanced Logging System**: Comprehensive training and testing logs
-- **Metrics Visualization**: Automatic generation of performance charts
-- **Progress Tracking**: Real-time progress bars with detailed metrics
-- **Multi-dataset Evaluation**: Support for testing on multiple datasets
+- **Reverse Attention**: Attention mechanism for focus refinement with three-stage processing
+- **Multi-scale Output**: 4 feature maps at different resolutions (8x, 16x, 32x, 4x upsampling)
+
+### Enhanced Features
+
+- **Advanced Logging System**: Comprehensive training and testing logs with timestamps
+- **Metrics Visualization**: Automatic generation of performance charts and comparison plots
+- **Progress Tracking**: Real-time progress bars with detailed metrics using tqdm
+- **Multi-dataset Evaluation**: Support for testing on 5 different polyp datasets
+- **Automated Workflow**: Complete automation from training to testing and result tracking
+- **Model Management**: Auto-naming conventions and model organization system
+- **Extended Metrics**: Comprehensive evaluation including confidence intervals
+
+### Loss Functions
+
+- **Structure Loss** (default): Combination of Focal Loss + weighted IoU Loss
+- **Dice Loss**: Standard Dice coefficient loss for medical segmentation
+- **Tversky Loss**: Configurable α and β parameters for handling class imbalance
+- **Combo Loss**: Combination of Dice and BCE losses
+- **Boundary Loss**: Gradient-based boundary preservation
+- **Unified Focal Loss**: Advanced focal loss with delta parameter
 
 ## Environment Setup
 
@@ -37,10 +54,13 @@ pip install -r requirements.txt
 - PyTorch 2.1.2+cu118
 - MMCV 2.2.0
 - timm 0.9.12
-- albumentations
-- OpenCV
-- matplotlib, seaborn (for visualization)
-- tqdm (for progress bars)
+- albumentations (data augmentation)
+- OpenCV 4.5.0+
+- matplotlib, seaborn (visualization)
+- tqdm (progress bars)
+- numpy 1.26.4
+- scipy (confidence intervals)
+- pandas (results tracking)
 
 ## Dataset Preparation
 
@@ -89,32 +109,40 @@ data/
 **Basic Training:**
 
 ```bash
-python train.py --backbone b3 --train_path ./data/TrainDataset --train_save ColonFormerB3
+python train.py --backbone b3 --train_path ./data/TrainDataset
 ```
 
 **Advanced Training with Custom Parameters:**
 
-```bash
+````bash
 python train.py \
     --backbone b3 \
     --num_epochs 50 \
     --batchsize 16 \
     --init_lr 1e-4 \
     --train_path ./data/TrainDataset \
-    --train_save ColonFormerB3_v2 \
-    --resume_path ./snapshots/ColonFormerB3/last.pth
-```
+    --resume_path ./snapshots/ColonFormer.../last.pth \
+    --loss_type tversky \
+    --tversky_alpha 0.7 \
+    --tversky_beta 0.3
+```w
 
 **Training Parameters:**
 
-- `--backbone`: b0, b1, b2, b3, b4, b5 (default: b3)
+- `--backbone`: b1, b2, b3, b4, b5 (default: b3)
+  - b1: ColonFormer-XS
+  - b2: ColonFormer-S
+  - b3: ColonFormer-L
+  - b4: ColonFormer-XL
+  - b5: ColonFormer-XXL
 - `--num_epochs`: Number of epochs (default: 20)
 - `--batchsize`: Batch size (default: 8)
 - `--init_lr`: Learning rate (default: 1e-4)
 - `--init_trainsize`: Training image size (default: 352)
 - `--clip`: Gradient clipping value (default: 0.5)
+- `--loss_type`: Loss function (structure, dice, tversky, combo, boundary, unified_focal)
 - `--train_path`: Path to training dataset
-- `--train_save`: Save folder name
+- `--train_save`: Save folder name (auto-generated if not provided)
 - `--resume_path`: Path to checkpoint for resuming training
 
 ### Testing
@@ -126,7 +154,7 @@ python test.py \
     --backbone b3 \
     --weight ./snapshots/ColonFormerB3/last.pth \
     --test_dataset Kvasir
-```
+````
 
 **Test on All Datasets:**
 
@@ -137,6 +165,24 @@ python test.py \
     --test_dataset all
 ```
 
+**Auto-test Untested Models:**
+
+```bash
+python test.py --auto_test --test_path ./data/TestDataset
+```
+
+**Show All Results:**
+
+```bash
+python test.py --show_all
+```
+
+**Compare Models:**
+
+```bash
+python test.py --compare
+```
+
 **Testing Parameters:**
 
 - `--backbone`: Backbone version used in training
@@ -144,56 +190,158 @@ python test.py \
 - `--test_path`: Path to test datasets (default: ./data/TestDataset)
 - `--test_dataset`: Specific dataset (Kvasir, ETIS-LaribPolypDB, CVC-ColonDB, CVC-ClinicDB, CVC-300) or 'all'
 
-### Output Files
+### Automated Workflow System
+
+**Complete Auto System:**
+
+```bash
+python complete_auto_system.py --show_status
+python complete_auto_system.py --complete_workflow
+```
+
+**Auto-rename Snapshots:**
+
+```bash
+python auto_rename_snapshots.py --skip_empty --execute
+```
+
+The system automatically:
+
+- Generates meaningful model names based on training parameters
+- Organizes snapshots with consistent naming conventions
+- Tracks tested vs untested models
+- Provides comprehensive result summaries
+
+### Output Files and Directories
 
 **Training Outputs:**
 
 - `logs/train_[model_name]_[timestamp].log`: Detailed training logs
-- `snapshots/[model_name]/last.pth`: Latest checkpoint
-- `snapshots/[model_name]/`: Training progress snapshots
+- `snapshots/[model_name]/last.pth`: Latest checkpoint with metadata
+- Training progress visualization and metrics tracking
 
 **Testing Outputs:**
 
 - `logs/test_[dataset]_[timestamp].log`: Detailed testing logs
-- `results/test_results_[timestamp].png`: Performance visualization
-- Console output with real-time metrics
+- `test_results/test_results_summary.csv`: Comprehensive results database
+- `results/test_results_[timestamp].png`: Performance visualization charts
+- Console output with real-time metrics and progress bars
 
 ## Model Architecture
 
-ColonFormer combines several key components:
+ColonFormer implements a sophisticated architecture with the following components:
 
-1. **Mix Transformer Backbone**: Multi-scale feature extraction using hierarchical vision transformer
-2. **Context Feature Pyramid (CFP) Module**: Context modeling with dilated convolutions at multiple scales
-3. **Axial Attention**: Efficient long-range dependency capture along spatial axes
-4. **Reverse Attention**: Boundary refinement through attention mechanism
-5. **Multi-output Supervision**: Training with outputs at 4 different scales
+### 1. Mix Transformer Backbone
 
-### Loss Function
+- Hierarchical vision transformer for multi-scale feature extraction
+- Support for 5 different model sizes (B1-B5)
+- Efficient patch embedding and positional encoding
 
-The model uses **Structure Loss** combining:
+### 2. Context Feature Pyramid (CFP) Module
 
-- **Focal Loss**: Handles class imbalance in medical segmentation
-- **Weighted IoU Loss**: Emphasizes boundary accuracy with spatial weighting
+```python
+self.CFP_1 = CFPModule(128, d=8)  # For x2 features
+self.CFP_2 = CFPModule(320, d=8)  # For x3 features
+self.CFP_3 = CFPModule(512, d=8)  # For x4 features
+```
+
+### 3. Axial Attention Mechanism
+
+```python
+self.aa_kernel_1 = AA_kernel(128, 128)  # 44x44 resolution
+self.aa_kernel_2 = AA_kernel(320, 320)  # 22x22 resolution
+self.aa_kernel_3 = AA_kernel(512, 512)  # 11x11 resolution
+```
+
+### 4. Three-Stage Reverse Attention
+
+- **Stage 1**: 512→320 features with 32x upsampling
+- **Stage 2**: 320→128 features with 16x upsampling
+- **Stage 3**: 128→output with 8x upsampling
+- Each stage uses reverse attention: `(-1 * sigmoid(decoder) + 1) * features`
+
+### 5. Multi-output Architecture
+
+Returns 4 outputs at different scales:
+
+- `lateral_map_5`: Main output (8x upsampling)
+- `lateral_map_3`: Intermediate output (16x upsampling)
+- `lateral_map_2`: Intermediate output (32x upsampling)
+- `lateral_map_1`: Coarse output (4x upsampling)
+
+## Loss Functions
+
+### Structure Loss (Default)
+
+Combines Focal Loss and weighted IoU Loss for handling class imbalance and boundary accuracy.
+
+### Advanced Loss Options
+
+```bash
+# Tversky Loss - better for small objects
+--loss_type tversky --tversky_alpha 0.7 --tversky_beta 0.3
+
+# Dice Loss - standard medical segmentation
+--loss_type dice
+
+# Combo Loss - BCE + Dice combination
+--loss_type combo --combo_alpha 0.5
+
+# Boundary Loss - gradient-based boundary preservation
+--loss_type boundary --boundary_theta0 3 --boundary_theta 5
+
+# Unified Focal Loss - advanced focal loss
+--loss_type unified_focal --focal_gamma 2.0 --focal_delta 0.6
+```
 
 ## Performance Metrics
 
-The evaluation includes comprehensive metrics:
+### Comprehensive Evaluation
 
 - **Dice Coefficient**: Overlap measure for segmentation quality
 - **Mean IoU (mIoU)**: Intersection over Union average
 - **Precision**: Positive predictive value
-- **Recall**: Sensitivity/True positive rate
+- **Recall/Sensitivity**: True positive rate
+- **Specificity**: True negative rate
+- **Accuracy**: Overall correctness
+- **F1-Score**: Harmonic mean of precision and recall
 
-All metrics are computed both overall and per-dataset for detailed analysis.
+### Statistical Analysis
 
-## Visualization Features
+- **Confidence Intervals**: 95% confidence intervals for all metrics
+- **Per-dataset Analysis**: Detailed breakdown by test dataset
+- **Model Comparison**: Comprehensive performance comparison charts
+- **Progress Tracking**: Real-time metric monitoring during training/testing
 
-The system automatically generates:
+## Automated Features
 
-- **Performance bar charts**: Overall metrics comparison
-- **Dataset comparison plots**: Performance across different test sets
-- **Radar charts**: Multi-metric performance visualization
-- **Model information summary**: Architecture details and parameters
+### Model Management
+
+- **Auto-naming**: Generates descriptive names based on training parameters
+- **Metadata Tracking**: Stores training configuration in checkpoints
+- **Organization**: Automatic folder structure and file organization
+
+### Testing Automation
+
+- **Untested Model Detection**: Automatically finds models that haven't been tested
+- **Batch Testing**: Tests multiple models sequentially
+- **Result Aggregation**: Consolidates results across all models and datasets
+
+### Visualization
+
+- **Performance Charts**: Automatic generation of comparison plots
+- **Radar Charts**: Multi-metric visualization
+- **Progress Plots**: Training progress and convergence analysis
+
+## Model Variants and Performance
+
+| Model           | Parameters | Backbone | Recommended Use                   |
+| --------------- | ---------- | -------- | --------------------------------- |
+| ColonFormer-XS  | ~13M       | MIT-B1   | Fast inference, limited resources |
+| ColonFormer-S   | ~25M       | MIT-B2   | Balanced speed/accuracy           |
+| ColonFormer-L   | ~47M       | MIT-B3   | Standard configuration            |
+| ColonFormer-XL  | ~62M       | MIT-B4   | High accuracy requirements        |
+| ColonFormer-XXL | ~82M       | MIT-B5   | Maximum performance               |
 
 ## Changes from Original Version
 
@@ -206,16 +354,18 @@ The system automatically generates:
 
 ### Enhanced Features
 
-- **Comprehensive Logging**: Detailed logs for training and testing
-- **Progress Bars**: Real-time training/testing progress with tqdm
-- **Metrics Visualization**: Automatic chart generation and saving
-- **Multi-dataset Support**: Enhanced testing on multiple datasets
+- **Complete Automation**: End-to-end workflow automation
+- **Advanced Metrics**: Extended evaluation with statistical analysis
+- **Model Management**: Sophisticated naming and organization system
+- **Multiple Loss Functions**: 6 different loss function options
+- **Real-time Monitoring**: Progress bars and live metric updates
 
 ### Performance Improvements
 
 - Optimized training loop with better memory management
 - Enhanced data loading with proper error checking
-- Improved checkpoint saving and loading mechanisms
+- Improved checkpoint saving with metadata
+- Parallel testing capabilities for multiple datasets
 
 ## Technical Requirements
 
@@ -224,12 +374,48 @@ The system automatically generates:
 - NVIDIA GPU with CUDA support (recommended: RTX 3080 or better)
 - Minimum 8GB GPU memory for batch size 8
 - 16GB+ system RAM recommended
+- SSD storage for faster data loading
 
 ### Software
 
 - CUDA 11.8 or compatible
 - cuDNN for accelerated training
 - Python 3.9+ environment
+- Windows 10/11 or Linux support
+
+## Advanced Usage
+
+### Jupyter Notebook Integration
+
+- `ColonFormer_Inference_Notebook.ipynb`: Interactive inference and visualization
+- `testcode.ipynb`: Development and testing notebook
+
+### Result Analysis
+
+```bash
+# View detailed result analysis
+python test.py --show_all
+
+# Compare specific models
+python test.py --compare
+
+# Export results to CSV
+# Results automatically saved to test_results/test_results_summary.csv
+```
+
+### Custom Training Configurations
+
+```bash
+# Training with custom loss combination
+python train.py \
+    --backbone b4 \
+    --loss_type tversky \
+    --tversky_alpha 0.8 \
+    --tversky_beta 0.2 \
+    --num_epochs 100 \
+    --batchsize 32 \
+    --init_lr 5e-5
+```
 
 ## Citation
 
@@ -268,3 +454,4 @@ If you encounter any problems or have questions:
 1. Check the existing issues in the repository
 2. Create a new issue with detailed information about your problem
 3. Include system information, error messages, and steps to reproduce
+4. Check the logs in the `logs/` directory for detailed error information

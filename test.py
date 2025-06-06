@@ -1101,28 +1101,15 @@ def create_model_identifier(metadata):
     return identifier
 
 
-def extract_metadata_from_checkpoint(weight_path):
-    """Extract metadata từ checkpoint file"""
-    try:
-        checkpoint = torch.load(weight_path, map_location='cpu')
-        
-        if 'training_metadata' in checkpoint:
-            return checkpoint['training_metadata']
-        else:
-            # Try to extract from old format or filename
-            return extract_metadata_from_filename(weight_path)
-            
-    except Exception as e:
-        print(f"   ❌ Error loading {weight_path}: {str(e)}")
-        return None
-
-
 def extract_metadata_from_filename(weight_path):
-    """Fallback: Extract metadata từ tên file/folder khi không có metadata"""
+    """Extract metadata từ tên file/folder với debug messages"""
     folder_name = os.path.basename(os.path.dirname(weight_path))
     
-    # Try to parse folder name format: ModelName_backbone_epochs_batchsize_loss_timestamp
+    print(f"   🔍 Parsing folder name: {folder_name}")
+    
+    # Try to parse folder name format: ModelName_backbone_epochs_batchsize_loss_timestamp_params
     parts = folder_name.split('_')
+    print(f"   📝 Split parts: {parts}")
     
     if len(parts) >= 5:
         try:
@@ -1137,35 +1124,103 @@ def extract_metadata_from_filename(weight_path):
                 model_name = '_'.join(model_parts)
                 backbone = parts[i]
                 
+                print(f"   📋 Found model_name: {model_name}, backbone: {backbone}")
+                
                 # Find epochs (contains 'ep')
                 epochs = 'unknown'
                 batch_size = 'unknown' 
                 loss_type = 'unknown'
+                loss_params = {}
                 
+                # Scan through remaining parts to find components
                 for j in range(i+1, len(parts)):
-                    if 'ep' in parts[j]:
-                        epochs = parts[j].replace('ep', '')
-                    elif 'bs' in parts[j]:
-                        batch_size = parts[j].replace('bs', '')
-                    elif parts[j] in ['structure', 'dice', 'tversky', 'combo', 'focal', 'unified_focal', 'boundary']:
-                        loss_type = parts[j]
-                        break
+                    part = parts[j]
+                    
+                    if 'ep' in part:
+                        epochs = part.replace('ep', '')
+                        print(f"   📊 Found epochs: {epochs}")
+                    elif 'bs' in part:
+                        batch_size = part.replace('bs', '')
+                        print(f"   📦 Found batch_size: {batch_size}")
+                    elif part in ['structure', 'dice', 'tversky', 'combo', 'focal', 'unified_focal', 'boundary']:
+                        loss_type = part
+                        print(f"   🎯 Found loss_type: {loss_type}")
+                        
+                        # Look for loss-specific parameters in remaining parts
+                        if loss_type == 'tversky':
+                            # Look for alpha and beta parameters (format: a0.7, b0.3)
+                            for k in range(j+1, len(parts)):
+                                if parts[k].startswith('a') and len(parts[k]) > 1:
+                                    try:
+                                        loss_params['tversky_alpha'] = float(parts[k][1:])
+                                        print(f"   🔧 Found tversky_alpha: {loss_params['tversky_alpha']}")
+                                    except ValueError:
+                                        pass
+                                elif parts[k].startswith('b') and len(parts[k]) > 1:
+                                    try:
+                                        loss_params['tversky_beta'] = float(parts[k][1:])
+                                        print(f"   🔧 Found tversky_beta: {loss_params['tversky_beta']}")
+                                    except ValueError:
+                                        pass
+                        
+                        elif loss_type == 'combo':
+                            # Look for alpha parameter (format: a0.5)
+                            for k in range(j+1, len(parts)):
+                                if parts[k].startswith('a') and len(parts[k]) > 1:
+                                    try:
+                                        loss_params['combo_alpha'] = float(parts[k][1:])
+                                        print(f"   🔧 Found combo_alpha: {loss_params['combo_alpha']}")
+                                    except ValueError:
+                                        pass
+                        
+                        elif loss_type == 'focal':
+                            # Look for gamma parameter (format: g2.0)
+                            for k in range(j+1, len(parts)):
+                                if parts[k].startswith('g') and len(parts[k]) > 1:
+                                    try:
+                                        loss_params['focal_gamma'] = float(parts[k][1:])
+                                        print(f"   🔧 Found focal_gamma: {loss_params['focal_gamma']}")
+                                    except ValueError:
+                                        pass
+                        
+                        elif loss_type == 'unified_focal':
+                            # Look for gamma and delta parameters (format: g2.0, d0.6)
+                            for k in range(j+1, len(parts)):
+                                if parts[k].startswith('g') and len(parts[k]) > 1:
+                                    try:
+                                        loss_params['focal_gamma'] = float(parts[k][1:])
+                                        print(f"   🔧 Found focal_gamma: {loss_params['focal_gamma']}")
+                                    except ValueError:
+                                        pass
+                                elif parts[k].startswith('d') and len(parts[k]) > 1:
+                                    try:
+                                        loss_params['focal_delta'] = float(parts[k][1:])
+                                        print(f"   🔧 Found focal_delta: {loss_params['focal_delta']}")
+                                    except ValueError:
+                                        pass
+                        
+                        break  # Found loss type, stop looking
                 
-                return {
+                result_metadata = {
                     'model_name': model_name,
                     'backbone': backbone,
                     'current_epoch': epochs,
                     'num_epochs': epochs,
                     'batch_size': batch_size,
                     'loss_type': loss_type,
-                    'loss_params': {},
+                    'loss_params': loss_params,
                     'extracted_from': 'filename'
                 }
-        except:
+                
+                print(f"   ✅ Extracted metadata: {result_metadata}")
+                return result_metadata
+                
+        except Exception as e:
+            print(f"   ⚠️  Error parsing filename: {e}")
             pass
     
     # Default fallback
-    return {
+    fallback_metadata = {
         'model_name': 'Unknown',
         'backbone': 'unknown',
         'current_epoch': 'unknown',
@@ -1175,6 +1230,140 @@ def extract_metadata_from_filename(weight_path):
         'loss_params': {},
         'extracted_from': 'fallback'
     }
+    
+    print(f"   ❌ Using fallback metadata: {fallback_metadata}")
+    return fallback_metadata
+
+
+def extract_metadata_from_checkpoint(weight_path):
+    """Extract metadata từ checkpoint file, ưu tiên thông tin từ folder name"""
+    try:
+        # First try to extract from folder name (more reliable) - silent version
+        folder_name = os.path.basename(os.path.dirname(weight_path))
+        parts = folder_name.split('_')
+        
+        folder_metadata = None
+        if len(parts) >= 5:
+            try:
+                # Extract model name (might contain hyphens)
+                model_parts = []
+                i = 0
+                while i < len(parts) and not parts[i].startswith(('b1', 'b2', 'b3', 'b4', 'b5')):
+                    model_parts.append(parts[i])
+                    i += 1
+                    
+                if i < len(parts):
+                    model_name = '_'.join(model_parts)
+                    backbone = parts[i]
+                    
+                    # Find epochs, batch_size, loss_type
+                    epochs = 'unknown'
+                    batch_size = 'unknown' 
+                    loss_type = 'unknown'
+                    loss_params = {}
+                    
+                    for j in range(i+1, len(parts)):
+                        part = parts[j]
+                        
+                        if 'ep' in part:
+                            epochs = part.replace('ep', '')
+                        elif 'bs' in part:
+                            batch_size = part.replace('bs', '')
+                        elif part in ['structure', 'dice', 'tversky', 'combo', 'focal', 'unified_focal', 'boundary']:
+                            loss_type = part
+                            
+                            # Look for loss-specific parameters
+                            if loss_type == 'tversky':
+                                for k in range(j+1, len(parts)):
+                                    if parts[k].startswith('a') and len(parts[k]) > 1:
+                                        try:
+                                            loss_params['tversky_alpha'] = float(parts[k][1:])
+                                        except ValueError:
+                                            pass
+                                    elif parts[k].startswith('b') and len(parts[k]) > 1:
+                                        try:
+                                            loss_params['tversky_beta'] = float(parts[k][1:])
+                                        except ValueError:
+                                            pass
+                            
+                            elif loss_type == 'combo':
+                                for k in range(j+1, len(parts)):
+                                    if parts[k].startswith('a') and len(parts[k]) > 1:
+                                        try:
+                                            loss_params['combo_alpha'] = float(parts[k][1:])
+                                        except ValueError:
+                                            pass
+                            
+                            elif loss_type == 'focal':
+                                for k in range(j+1, len(parts)):
+                                    if parts[k].startswith('g') and len(parts[k]) > 1:
+                                        try:
+                                            loss_params['focal_gamma'] = float(parts[k][1:])
+                                        except ValueError:
+                                            pass
+                            
+                            elif loss_type == 'unified_focal':
+                                for k in range(j+1, len(parts)):
+                                    if parts[k].startswith('g') and len(parts[k]) > 1:
+                                        try:
+                                            loss_params['focal_gamma'] = float(parts[k][1:])
+                                        except ValueError:
+                                            pass
+                                    elif parts[k].startswith('d') and len(parts[k]) > 1:
+                                        try:
+                                            loss_params['focal_delta'] = float(parts[k][1:])
+                                        except ValueError:
+                                            pass
+                            
+                            break
+                    
+                    folder_metadata = {
+                        'model_name': model_name,
+                        'backbone': backbone,
+                        'current_epoch': epochs,
+                        'num_epochs': epochs,
+                        'batch_size': batch_size,
+                        'loss_type': loss_type,
+                        'loss_params': loss_params,
+                        'extracted_from': 'filename'
+                    }
+            except:
+                pass
+        
+        # If folder metadata extraction was successful (not fallback), use it
+        if folder_metadata and folder_metadata.get('loss_type') != 'unknown':
+            print(f"   ✅ Using folder metadata (more reliable)")
+            return folder_metadata
+        
+        # Otherwise, try checkpoint metadata
+        checkpoint = torch.load(weight_path, map_location='cpu')
+        
+        if 'training_metadata' in checkpoint:
+            checkpoint_metadata = checkpoint['training_metadata']
+            checkpoint_metadata['extracted_from'] = 'metadata'
+            print(f"   ✅ Using checkpoint metadata")
+            return checkpoint_metadata
+        else:
+            # If no checkpoint metadata, use folder result or fallback
+            if folder_metadata:
+                print(f"   ⚠️  No checkpoint metadata found, using folder extraction result")
+                return folder_metadata
+            else:
+                print(f"   ❌ Using fallback metadata")
+                return {
+                    'model_name': 'Unknown',
+                    'backbone': 'unknown',
+                    'current_epoch': 'unknown',
+                    'num_epochs': 'unknown', 
+                    'batch_size': 'unknown',
+                    'loss_type': 'unknown',
+                    'loss_params': {},
+                    'extracted_from': 'fallback'
+                }
+            
+    except Exception as e:
+        print(f"   ❌ Error loading {weight_path}: {str(e)}")
+        return None
 
 
 def get_tested_models():
