@@ -19,6 +19,21 @@ import random
 import logging
 import argparse
 
+# Import loss functions từ train.py
+try:
+    from train import (
+        DiceWeightedIoUFocalLoss,
+        get_loss_function,
+        dice_m,
+        iou_m,
+        precision_m,
+        recall_m
+    )
+    HAS_LOSS_FUNCTIONS = True
+except ImportError:
+    HAS_LOSS_FUNCTIONS = False
+    logging.warning("Cannot import loss functions from train.py")
+
 
 try:
     from scipy import stats
@@ -30,11 +45,10 @@ except ImportError:
 
 class Dataset(torch.utils.data.Dataset):
 
-    def __init__(self, img_paths, mask_paths, aug=True, transform=None):
+    def __init__(self, img_paths, mask_paths, trainsize=352):
         self.img_paths = img_paths
         self.mask_paths = mask_paths
-        self.aug = aug
-        self.transform = transform
+        self.trainsize = trainsize
 
     def __len__(self):
         return len(self.img_paths)
@@ -46,13 +60,8 @@ class Dataset(torch.utils.data.Dataset):
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         mask = cv2.imread(mask_path, 0)
 
-        if self.transform is not None:
-            augmented = self.transform(image=image, mask=mask)
-            image = augmented['image']
-            mask = augmented['mask']
-        else:
-            image = cv2.resize(image, (352, 352))
-            mask = cv2.resize(mask, (352, 352))
+        image = cv2.resize(image, (self.trainsize, self.trainsize))
+        mask = cv2.resize(mask, (self.trainsize, self.trainsize))
 
         image = image.astype('float32') / 255
         image = image.transpose((2, 0, 1))
@@ -617,10 +626,22 @@ def inference(model, args):
     gts = []
     prs = []
     dataset_results = {}
+    
+    # Component loss tracking cho dice_weighted_iou_focal
+    component_losses = []
+    has_component_loss = HAS_LOSS_FUNCTIONS and args.loss_type == 'dice_weighted_iou_focal'
+    
+    if has_component_loss:
+        logging.info(f"Tracking component losses for dice_weighted_iou_focal")
+        logging.info(f"  Dice weight: {args.dice_weight}")
+        logging.info(f"  IoU weight: {args.iou_weight}")
+        logging.info(f"  Focal weight: {args.focal_weight}")
 
     # Initialize dataset results
     for dataset in dataset_info.keys():
         dataset_results[dataset] = {'gts': [], 'prs': []}
+        if has_component_loss:
+            dataset_results[dataset]['component_losses'] = []
 
     # Progress bar với tqdm
     progress_bar = tqdm(test_loader, desc='Testing', unit='img',
@@ -652,6 +673,32 @@ def inference(model, args):
             res, res2, res3, res4 = model(image)
             res = F.interpolate(res, size=gt.shape,
                                 mode='bilinear', align_corners=False)
+            
+            # Calculate component losses nếu dùng dice_weighted_iou_focal
+            if has_component_loss:
+                # Prepare loss kwargs
+                loss_kwargs = {
+                    'dice_weight': args.dice_weight,
+                    'iou_weight': args.iou_weight,
+                    'focal_weight': args.focal_weight,
+                    'focal_alpha': args.focal_alpha,
+                    'focal_gamma': args.focal_gamma,
+                    'smooth': args.smooth,
+                    'spatial_weight': args.spatial_weight
+                }
+                
+                # Calculate component losses
+                gt_tensor = torch.tensor(gt).unsqueeze(0).unsqueeze(0).cuda()
+                res_tensor = res.unsqueeze(0)
+                
+                loss_instance = DiceWeightedIoUFocalLoss(**loss_kwargs)
+                comp_loss = loss_instance.get_component_losses(res_tensor, gt_tensor)
+                component_losses.append(comp_loss)
+                
+                # Store per dataset component loss
+                if current_dataset and current_dataset in dataset_results:
+                    dataset_results[current_dataset]['component_losses'].append(comp_loss)
+            
             res = res.sigmoid().data.cpu().numpy().squeeze()
             res = (res - res.min()) / (res.max() - res.min() + 1e-8)
             pr = res.round()
@@ -683,6 +730,8 @@ def inference(model, args):
         if len(data['gts']) > 0:
             metrics, dataset_stats, dataset_individual = get_scores(
                 data['gts'], data['prs'])
+            
+            # Base metrics
             dataset_metrics[dataset] = {
                 'miou': metrics[0],
                 'dice': metrics[1],
@@ -695,6 +744,30 @@ def inference(model, args):
                 'sensitivity': dataset_stats['sensitivity']['mean'],
                 'specificity': dataset_stats['specificity']['mean']
             }
+            
+            # Add component loss statistics if available
+            if has_component_loss and 'component_losses' in data and len(data['component_losses']) > 0:
+                comp_losses = data['component_losses']
+                avg_dice_loss = np.mean([cl['dice_loss'] for cl in comp_losses])
+                avg_iou_loss = np.mean([cl['iou_loss'] for cl in comp_losses])
+                avg_focal_loss = np.mean([cl['focal_loss'] for cl in comp_losses])
+                avg_total_loss = np.mean([cl['total_loss'] for cl in comp_losses])
+                
+                dataset_metrics[dataset]['component_losses'] = {
+                    'dice_loss': avg_dice_loss,
+                    'iou_loss': avg_iou_loss,
+                    'focal_loss': avg_focal_loss,
+                    'total_loss': avg_total_loss,
+                    'dice_contribution': avg_dice_loss * args.dice_weight,
+                    'iou_contribution': avg_iou_loss * args.iou_weight,
+                    'focal_contribution': avg_focal_loss * args.focal_weight,
+                    'weights': {
+                        'dice_weight': args.dice_weight,
+                        'iou_weight': args.iou_weight,
+                        'focal_weight': args.focal_weight
+                    }
+                }
+            
             dataset_individual_metrics[dataset] = dataset_individual
 
     # Print comprehensive results
@@ -716,6 +789,29 @@ def inference(model, args):
             'test_time': time.time() - start_time
         }, args)
 
+    # Calculate overall component loss statistics
+    overall_component_losses = None
+    if has_component_loss and len(component_losses) > 0:
+        overall_avg_dice_loss = np.mean([cl['dice_loss'] for cl in component_losses])
+        overall_avg_iou_loss = np.mean([cl['iou_loss'] for cl in component_losses])
+        overall_avg_focal_loss = np.mean([cl['focal_loss'] for cl in component_losses])
+        overall_avg_total_loss = np.mean([cl['total_loss'] for cl in component_losses])
+        
+        overall_component_losses = {
+            'dice_loss': overall_avg_dice_loss,
+            'iou_loss': overall_avg_iou_loss,
+            'focal_loss': overall_avg_focal_loss,
+            'total_loss': overall_avg_total_loss,
+            'dice_contribution': overall_avg_dice_loss * args.dice_weight,
+            'iou_contribution': overall_avg_iou_loss * args.iou_weight,
+            'focal_contribution': overall_avg_focal_loss * args.focal_weight,
+            'weights': {
+                'dice_weight': args.dice_weight,
+                'iou_weight': args.iou_weight,
+                'focal_weight': args.focal_weight
+            }
+        }
+
     # Prepare results dictionary for visualization
     results_dict = {
         'overall': {
@@ -730,8 +826,13 @@ def inference(model, args):
         'backbone': args.backbone,
         'total_params': sum(p.numel() for p in model.parameters()),
         'total_images': len(X_test),
-        'test_time': time.time() - start_time
+        'test_time': time.time() - start_time,
+        'loss_type': args.loss_type
     }
+    
+    # Add component loss info if available
+    if overall_component_losses:
+        results_dict['overall']['component_losses'] = overall_component_losses
 
     # Create and save visualization
     img_path = create_metrics_visualization(results_dict)
@@ -808,11 +909,11 @@ def print_comprehensive_results(dataset_metrics, overall_metrics, stats_dict, te
     best_dataset = max(dataset_metrics, key=lambda x: dataset_metrics[x]['dice'])
     worst_dataset = min(dataset_metrics, key=lambda x: dataset_metrics[x]['dice'])
     
-    print(f"🥇 Best Dataset:     {best_dataset} (Dice: {dataset_metrics[best_dataset]['dice']:.3f})")
-    print(f"🥉 Worst Dataset:    {worst_dataset} (Dice: {dataset_metrics[worst_dataset]['dice']:.3f})")
+    print(f"Best Dataset:     {best_dataset} (Dice: {dataset_metrics[best_dataset]['dice']:.3f})")
+    print(f"Worst Dataset:    {worst_dataset} (Dice: {dataset_metrics[worst_dataset]['dice']:.3f})")
     
     dice_gap = dataset_metrics[best_dataset]['dice'] - dataset_metrics[worst_dataset]['dice']
-    print(f"📊 Performance Gap:  {dice_gap:.3f} ({dice_gap*100:.1f}%)")
+    print(f"Performance Gap:  {dice_gap:.3f} ({dice_gap*100:.1f}%)")
     
     # Model characteristics
     precision_mean = stats_dict['precision']['mean']
@@ -825,8 +926,8 @@ def print_comprehensive_results(dataset_metrics, overall_metrics, stats_dict, te
     else:
         model_char = "Balanced (Similar Precision & Recall)"
     
-    print(f"🎯 Model Character:  {model_char}")
-    print(f"📈 Stability:        σ = {dice_std:.3f} ({'Stable' if dice_std < 0.1 else 'Variable'})")
+    print(f"Model Character:  {model_char}")
+    print(f"Stability:        σ = {dice_std:.3f} ({'Stable' if dice_std < 0.1 else 'Variable'})")
     
     # Performance distribution
     print(f"\n{'PERFORMANCE DISTRIBUTION':^100}")
@@ -853,24 +954,96 @@ def print_comprehensive_results(dataset_metrics, overall_metrics, stats_dict, te
     print("="*100)
     
     if dice_mean < 0.5:
-        print("⚠️  CRITICAL: Very low performance detected!")
-        print("   • Check if model weights are loaded correctly")
-        print("   • Verify data preprocessing matches training")
-        print("   • Consider retraining with better hyperparameters")
+        print("CRITICAL: Very low performance detected!")
+        print("   - Check if model weights are loaded correctly")
+        print("   - Verify data preprocessing matches training")
+        print("   - Consider retraining with better hyperparameters")
     elif dice_mean < 0.7:
-        print("⚠️  MODERATE: Performance below expectations")
-        print("   • Consider data augmentation strategies")
-        print("   • Experiment with different loss functions")
-        print("   • Check for dataset distribution mismatch")
+        print("MODERATE: Performance below expectations")
+        print("   - Consider data augmentation strategies")
+        print("   - Experiment with different loss functions")
+        print("   - Check for dataset distribution mismatch")
     else:
-        print("✅ GOOD: Model performance is acceptable")
-        print("   • Consider fine-tuning on challenging datasets")
-        print("   • Experiment with ensemble methods")
+        print("GOOD: Model performance is acceptable")
+        print("   - Consider fine-tuning on challenging datasets")
+        print("   - Experiment with ensemble methods")
     
     if dice_std > 0.15:
-        print("📊 HIGH VARIANCE: Model performance is inconsistent")
-        print("   • Consider more robust training strategies")
-        print("   • Implement cross-validation")
+        print("HIGH VARIANCE: Model performance is inconsistent")
+        print("   - Consider more robust training strategies")
+        print("   - Implement cross-validation")
+    
+    # Component Loss Analysis (nếu có)
+    has_component_loss = any('component_losses' in metrics for metrics in dataset_metrics.values())
+    
+    if has_component_loss:
+        print(f"\n{'COMPONENT LOSS ANALYSIS':^100}")
+        print("="*100)
+        
+        # Tìm một dataset có component loss để lấy weights
+        sample_dataset = next((dataset for dataset, metrics in dataset_metrics.items() 
+                             if 'component_losses' in metrics), None)
+        
+        if sample_dataset:
+            weights = dataset_metrics[sample_dataset]['component_losses']['weights']
+            print(f"Loss Weights: Dice={weights['dice_weight']:.2f} | IoU={weights['iou_weight']:.2f} | Focal={weights['focal_weight']:.2f}")
+            print("-"*100)
+            
+            print(f"{'Dataset':<18} | {'Total Loss':<10} | {'Dice Loss':<10} | {'IoU Loss':<10} | {'Focal Loss':<10} | {'Contributions'}")
+            print("-"*100)
+            
+            for dataset, metrics in sorted_datasets:
+                if 'component_losses' in metrics:
+                    cl = metrics['component_losses']
+                    contrib_str = f"D:{cl['dice_contribution']:.3f} I:{cl['iou_contribution']:.3f} F:{cl['focal_contribution']:.3f}"
+                    print(f"{dataset:<18} | {cl['total_loss']:<10.4f} | {cl['dice_loss']:<10.4f} | {cl['iou_loss']:<10.4f} | {cl['focal_loss']:<10.4f} | {contrib_str}")
+            
+            # Overall component loss statistics
+            print("-"*100)
+            avg_dice_loss = np.mean([metrics['component_losses']['dice_loss'] 
+                                   for metrics in dataset_metrics.values() 
+                                   if 'component_losses' in metrics])
+            avg_iou_loss = np.mean([metrics['component_losses']['iou_loss'] 
+                                  for metrics in dataset_metrics.values() 
+                                  if 'component_losses' in metrics])
+            avg_focal_loss = np.mean([metrics['component_losses']['focal_loss'] 
+                                    for metrics in dataset_metrics.values() 
+                                    if 'component_losses' in metrics])
+            avg_total_loss = np.mean([metrics['component_losses']['total_loss'] 
+                                    for metrics in dataset_metrics.values() 
+                                    if 'component_losses' in metrics])
+            
+            contrib_dice = avg_dice_loss * weights['dice_weight']
+            contrib_iou = avg_iou_loss * weights['iou_weight']
+            contrib_focal = avg_focal_loss * weights['focal_weight']
+            
+            print(f"{'AVERAGE':<18} | {avg_total_loss:<10.4f} | {avg_dice_loss:<10.4f} | {avg_iou_loss:<10.4f} | {avg_focal_loss:<10.4f} | D:{contrib_dice:.3f} I:{contrib_iou:.3f} F:{contrib_focal:.3f}")
+            
+            # Component loss insights
+            print(f"\n{'COMPONENT LOSS INSIGHTS':^100}")
+            print("="*100)
+            
+            # Tìm thành phần loss dominant
+            if contrib_dice > contrib_iou and contrib_dice > contrib_focal:
+                dominant = "Dice Loss"
+                insight = "Model struggles most with overlap/intersection accuracy"
+            elif contrib_iou > contrib_dice and contrib_iou > contrib_focal:
+                dominant = "IoU Loss"
+                insight = "Model struggles most with shape/boundary precision"
+            else:
+                dominant = "Focal Loss"
+                insight = "Model struggles most with hard examples/class imbalance"
+            
+            print(f"Dominant Component: {dominant}")
+            print(f"Primary Challenge: {insight}")
+            
+            # Recommendation dựa trên component loss
+            if avg_dice_loss > 0.5:
+                print("Dice Loss High: Consider increasing dice_weight or improving overlap accuracy")
+            if avg_iou_loss > 0.5:
+                print("IoU Loss High: Consider increasing iou_weight or improving boundary precision")
+            if avg_focal_loss > 0.5:
+                print("Focal Loss High: Consider increasing focal_weight or adjusting focal_gamma")
     
     print("="*100)
 
@@ -1501,6 +1674,13 @@ def auto_test_untested_models(args):
             combo_alpha=metadata.get('loss_params', {}).get('combo_alpha', 0.5),
             focal_gamma=metadata.get('loss_params', {}).get('focal_gamma', 2.0),
             focal_delta=metadata.get('loss_params', {}).get('focal_delta', 0.6),
+            # Dice Weighted IoU Focal Loss parameters
+            dice_weight=metadata.get('loss_params', {}).get('dice_weight', 0.4),
+            iou_weight=metadata.get('loss_params', {}).get('iou_weight', 0.3),
+            focal_weight=metadata.get('loss_params', {}).get('focal_weight', 0.3),
+            focal_alpha=metadata.get('loss_params', {}).get('focal_alpha', 0.25),
+            smooth=metadata.get('loss_params', {}).get('smooth', 1e-6),
+            spatial_weight=metadata.get('loss_params', {}).get('spatial_weight', True),
         )
         
         try:
@@ -1576,6 +1756,14 @@ def main():
     parser.add_argument('--focal_delta', type=float, default=0.6, help='delta for Unified Focal Loss')
     parser.add_argument('--epochs', type=int, default=20, help='number of epochs used for training (for tracking)')
     
+    # Dice Weighted IoU Focal Loss arguments
+    parser.add_argument('--dice_weight', type=float, default=0.4, help='dice weight for dice_weighted_iou_focal loss')
+    parser.add_argument('--iou_weight', type=float, default=0.3, help='iou weight for dice_weighted_iou_focal loss')
+    parser.add_argument('--focal_weight', type=float, default=0.3, help='focal weight for dice_weighted_iou_focal loss')
+    parser.add_argument('--focal_alpha', type=float, default=0.25, help='focal alpha for dice_weighted_iou_focal loss')
+    parser.add_argument('--smooth', type=float, default=1e-6, help='smoothing factor for dice_weighted_iou_focal loss')
+    parser.add_argument('--spatial_weight', type=bool, default=True, help='use spatial weighting for dice_weighted_iou_focal loss')
+    
     # Special arguments for viewing results
     parser.add_argument('--show_all', action='store_true', help='Display all accumulated test results')
     parser.add_argument('--compare', action='store_true', help='Compare all models')
@@ -1640,6 +1828,45 @@ def main():
         checkpoint = torch.load(args.weight)
         model.load_state_dict(checkpoint['state_dict'])
         logging.info(f"Successfully loaded weights from: {args.weight}")
+        
+        # Auto detect loss configuration from checkpoint metadata
+        if 'training_metadata' in checkpoint:
+            metadata = checkpoint['training_metadata']
+            
+            # Auto set loss type
+            if 'loss_type' in metadata:
+                detected_loss_type = metadata['loss_type']
+                if args.loss_type != detected_loss_type:
+                    logging.info(f"Auto detected loss type: {detected_loss_type} (overriding {args.loss_type})")
+                    args.loss_type = detected_loss_type
+            
+            # Auto set loss parameters
+            if 'loss_params' in metadata:
+                loss_params = metadata['loss_params']
+                logging.info("Auto detected loss parameters:")
+                
+                for param_name, param_value in loss_params.items():
+                    if hasattr(args, param_name):
+                        old_value = getattr(args, param_name)
+                        if old_value != param_value:  # Only log if different
+                            setattr(args, param_name, param_value)
+                            logging.info(f"  {param_name}: {old_value} -> {param_value}")
+                    else:
+                        logging.info(f"  {param_name}: {param_value} (new parameter)")
+                        setattr(args, param_name, param_value)
+            
+            # Log component loss info if available
+            if 'component_losses' in metadata:
+                comp_losses = metadata['component_losses']
+                logging.info("Training Component Loss Information:")
+                logging.info(f"  Training Dice Loss: {comp_losses['dice_loss']:.6f}")
+                logging.info(f"  Training IoU Loss: {comp_losses['iou_loss']:.6f}")
+                logging.info(f"  Training Focal Loss: {comp_losses['focal_loss']:.6f}")
+                if 'weights' in comp_losses:
+                    weights = comp_losses['weights']
+                    logging.info(f"  Training Weights: D={weights['dice_weight']:.3f}, I={weights['iou_weight']:.3f}, F={weights['focal_weight']:.3f}")
+        else:
+            logging.info("No training metadata found in checkpoint, using manual parameters")
 
     # Run inference
     results = inference(model, args)

@@ -617,6 +617,12 @@ def train(train_loader, model, optimizer, epoch, lr_scheduler, args):
     size_rates = [0.75, 1, 1.25]
     loss_record = AvgMeter()
     dice, iou = AvgMeter(), AvgMeter()
+    
+    # Component loss tracking cho dice_weighted_iou_focal
+    if args.loss_type == 'dice_weighted_iou_focal':
+        dice_loss_record = AvgMeter()
+        iou_loss_record = AvgMeter()
+        focal_loss_record = AvgMeter()
 
     # Tracking time
     epoch_start_time = time.time()
@@ -624,7 +630,7 @@ def train(train_loader, model, optimizer, epoch, lr_scheduler, args):
     # Progress bar setup với tqdm
     print(f"\n==> Epoch {epoch}/{args.num_epochs}")
     progress_bar = tqdm(train_loader, desc=f'Epoch {epoch}/{args.num_epochs}',
-                        unit='batch', ncols=150,
+                        unit='batch', ncols=180,
                         bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
 
     # Prepare loss function parameters
@@ -687,6 +693,17 @@ def train(train_loader, model, optimizer, epoch, lr_scheduler, args):
                 # ---- metrics ----
                 dice_score = dice_m(map4, gts)
                 iou_score = iou_m(map4, gts)
+                
+                # ---- track component losses cho dice_weighted_iou_focal ----
+                if rate == 1 and args.loss_type == 'dice_weighted_iou_focal':
+                    # Tính component losses từ map4 (main output)
+                    loss_instance = DiceWeightedIoUFocalLoss(**loss_kwargs)
+                    component_losses = loss_instance.get_component_losses(map4, gts)
+                    
+                    dice_loss_record.update(component_losses['dice_loss'], args.batchsize)
+                    iou_loss_record.update(component_losses['iou_loss'], args.batchsize)
+                    focal_loss_record.update(component_losses['focal_loss'], args.batchsize)
+                
                 # ---- backward ----
                 loss.backward()
                 clip_gradient(optimizer, args.clip)
@@ -699,13 +716,27 @@ def train(train_loader, model, optimizer, epoch, lr_scheduler, args):
 
             # Update progress bar với metrics
             current_lr = optimizer.param_groups[0]['lr']
-            progress_bar.set_postfix({
-                'Loss': f'{loss_record.show():.4f}',
-                'Dice': f'{dice.show():.4f}',
-                'IoU': f'{iou.show():.4f}',
-                'LR': f'{current_lr:.6f}',
-                'Type': args.loss_type
-            })
+            
+            if args.loss_type == 'dice_weighted_iou_focal':
+                # Hiển thị chi tiết component losses
+                progress_bar.set_postfix({
+                    'Total': f'{loss_record.show():.4f}',
+                    'Dice': f'{dice_loss_record.show():.4f}',
+                    'IoU': f'{iou_loss_record.show():.4f}',
+                    'Focal': f'{focal_loss_record.show():.4f}',
+                    'Acc_D': f'{dice.show():.4f}',
+                    'Acc_I': f'{iou.show():.4f}',
+                    'LR': f'{current_lr:.6f}'
+                })
+            else:
+                # Progress bar thông thường
+                progress_bar.set_postfix({
+                    'Loss': f'{loss_record.show():.4f}',
+                    'Dice': f'{dice.show():.4f}',
+                    'IoU': f'{iou.show():.4f}',
+                    'LR': f'{current_lr:.6f}',
+                    'Type': args.loss_type
+                })
 
             # Final summary at end of epoch
             if i == total_step:
@@ -715,11 +746,34 @@ def train(train_loader, model, optimizer, epoch, lr_scheduler, args):
                     f'\n{datetime.now()} Training Epoch [{epoch:03d}/{args.num_epochs:03d}] COMPLETED')
                 logging.info(
                     f'Epoch time: {epoch_time:.2f}s ({epoch_time/60:.2f}m)')
-                logging.info(
-                    f'Final metrics - Loss: {loss_record.show():.4f}, Dice: {dice.show():.4f}, IoU: {iou.show():.4f}')
+                
+                if args.loss_type == 'dice_weighted_iou_focal':
+                    # Chi tiết component losses
+                    logging.info(f'Final Loss Components:')
+                    logging.info(f'  Total Loss: {loss_record.show():.4f}')
+                    logging.info(f'  Dice Loss: {dice_loss_record.show():.4f} (weight: {args.dice_weight})')
+                    logging.info(f'  IoU Loss: {iou_loss_record.show():.4f} (weight: {args.iou_weight})')
+                    logging.info(f'  Focal Loss: {focal_loss_record.show():.4f} (weight: {args.focal_weight})')
+                    logging.info(f'Final Accuracy - Dice: {dice.show():.4f}, IoU: {iou.show():.4f}')
+                else:
+                    logging.info(
+                        f'Final metrics - Loss: {loss_record.show():.4f}, Dice: {dice.show():.4f}, IoU: {iou.show():.4f}')
 
     # Tạo checkpoint với metadata đầy đủ
     training_metadata = create_training_metadata(args, model, epoch, total_step, loss_record, dice, iou)
+    
+    # Thêm component loss information nếu sử dụng dice_weighted_iou_focal
+    if args.loss_type == 'dice_weighted_iou_focal':
+        training_metadata['component_losses'] = {
+            'dice_loss': float(dice_loss_record.show()),
+            'iou_loss': float(iou_loss_record.show()),
+            'focal_loss': float(focal_loss_record.show()),
+            'weights': {
+                'dice_weight': args.dice_weight,
+                'iou_weight': args.iou_weight,
+                'focal_weight': args.focal_weight
+            }
+        }
     
     checkpoint = {
         'epoch': epoch,
@@ -1003,6 +1057,8 @@ if __name__ == '__main__':
                         default=0.4, help='dice_weight for Dice Weighted IoU Focal Loss')
     parser.add_argument('--iou_weight', type=float,
                         default=0.3, help='iou_weight for Dice Weighted IoU Focal Loss')
+    parser.add_argument('--focal_weight', type=float,
+                        default=0.3, help='focal_weight for Dice Weighted IoU Focal Loss')
     parser.add_argument('--focal_alpha', type=float,
                         default=0.25, help='focal_alpha for Dice Weighted IoU Focal Loss')
     parser.add_argument('--smooth', type=float,
@@ -1081,6 +1137,24 @@ if __name__ == '__main__':
 
     # Log model and training information
     log_train_model_info(model, args, total_step)
+    
+    # Log chi tiết loss configuration nếu dùng dice_weighted_iou_focal
+    if args.loss_type == 'dice_weighted_iou_focal':
+        logging.info("\n" + "="*60)
+        logging.info("DICE WEIGHTED IOU FOCAL LOSS CONFIGURATION")
+        logging.info("="*60)
+        logging.info(f"Component Weights:")
+        logging.info(f"  Dice Weight: {args.dice_weight:.3f}")
+        logging.info(f"  IoU Weight: {args.iou_weight:.3f}")
+        logging.info(f"  Focal Weight: {args.focal_weight:.3f}")
+        logging.info(f"  Total Weight: {args.dice_weight + args.iou_weight + args.focal_weight:.3f}")
+        logging.info(f"Focal Parameters:")
+        logging.info(f"  Focal Alpha: {args.focal_alpha}")
+        logging.info(f"  Focal Gamma: {args.focal_gamma}")
+        logging.info(f"Other Parameters:")
+        logging.info(f"  Smoothing Factor: {args.smooth}")
+        logging.info(f"  Spatial Weighting: {args.spatial_weight}")
+        logging.info("="*60)
 
     # Print model info
     total_params = sum(p.numel() for p in model.parameters())
