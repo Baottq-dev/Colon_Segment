@@ -296,6 +296,133 @@ class UnifiedFocalLoss(nn.Module):
         return loss
 
 
+class DiceWeightedIoUFocalLoss(nn.Module):
+    """
+    Kết hợp Dice Loss + Weighted IoU + Focal Loss
+    Tối ưu cho polyp segmentation với khả năng điều chỉnh trọng số từng thành phần
+    
+    Args:
+        dice_weight (float): Trọng số cho Dice Loss (0.0-1.0)
+        iou_weight (float): Trọng số cho Weighted IoU Loss (0.0-1.0) 
+        focal_weight (float): Trọng số cho Focal Loss (0.0-1.0)
+        focal_alpha (float): Alpha parameter cho Focal Loss
+        focal_gamma (float): Gamma parameter cho Focal Loss
+        smooth (float): Smoothing factor cho Dice và IoU
+        spatial_weight (bool): Có sử dụng spatial weighting hay không
+    """
+    
+    def __init__(self, 
+                 dice_weight=0.4, 
+                 iou_weight=0.3, 
+                 focal_weight=0.3,
+                 focal_alpha=0.25,
+                 focal_gamma=2.0,
+                 smooth=1e-6,
+                 spatial_weight=True,
+                 reduction='mean'):
+        super(DiceWeightedIoUFocalLoss, self).__init__()
+        
+        # Kiểm tra tổng trọng số
+        total_weight = dice_weight + iou_weight + focal_weight
+        if abs(total_weight - 1.0) > 1e-6:
+            print(f"Cảnh báo: Tổng trọng số = {total_weight:.3f} ≠ 1.0")
+            # Normalize weights
+            dice_weight /= total_weight
+            iou_weight /= total_weight  
+            focal_weight /= total_weight
+            print(f"Đã normalize: dice={dice_weight:.3f}, iou={iou_weight:.3f}, focal={focal_weight:.3f}")
+            
+        self.dice_weight = dice_weight
+        self.iou_weight = iou_weight
+        self.focal_weight = focal_weight
+        self.focal_alpha = focal_alpha
+        self.focal_gamma = focal_gamma
+        self.smooth = smooth
+        self.spatial_weight = spatial_weight
+        self.reduction = reduction
+        
+        # Initialize loss components
+        self.focal_loss = FocalLossV1(alpha=focal_alpha, gamma=focal_gamma, reduction='none')
+        
+    def forward(self, pred, target):
+        # Tính spatial weight nếu được kích hoạt
+        if self.spatial_weight:
+            # Enhanced boundary weighting
+            spatial_weit = 1 + 5 * torch.abs(
+                F.avg_pool2d(target, kernel_size=31, stride=1, padding=15) - target
+            )
+        else:
+            spatial_weit = torch.ones_like(target)
+            
+        # 1. Dice Loss Component
+        pred_sigmoid = torch.sigmoid(pred)
+        
+        # Flatten tensors for dice calculation
+        pred_flat = pred_sigmoid.contiguous().view(-1)
+        target_flat = target.contiguous().view(-1)
+        spatial_flat = spatial_weit.contiguous().view(-1)
+        
+        # Weighted intersection and union for Dice
+        intersection = (pred_flat * target_flat * spatial_flat).sum()
+        dice_denominator = (pred_flat * spatial_flat).sum() + (target_flat * spatial_flat).sum()
+        dice_loss = 1 - (2.0 * intersection + self.smooth) / (dice_denominator + self.smooth)
+        
+        # 2. Weighted IoU Loss Component  
+        union = pred_flat * spatial_flat + target_flat * spatial_flat - pred_flat * target_flat * spatial_flat
+        iou_loss = 1 - (intersection + self.smooth) / (union.sum() + self.smooth)
+        
+        # 3. Focal Loss Component
+        focal_loss_raw = self.focal_loss(pred, target)
+        if self.spatial_weight:
+            # Apply spatial weighting to focal loss
+            focal_loss_weighted = (focal_loss_raw * spatial_weit).sum(dim=(2, 3)) / spatial_weit.sum(dim=(2, 3))
+            focal_loss = focal_loss_weighted.mean()
+        else:
+            focal_loss = focal_loss_raw.mean()
+        
+        # Combine losses với trọng số đã định
+        total_loss = (self.dice_weight * dice_loss + 
+                     self.iou_weight * iou_loss + 
+                     self.focal_weight * focal_loss)
+        
+        return total_loss
+    
+    def get_component_losses(self, pred, target):
+        """Trả về loss của từng thành phần để theo dõi"""
+        # Tính spatial weight
+        if self.spatial_weight:
+            spatial_weit = 1 + 5 * torch.abs(
+                F.avg_pool2d(target, kernel_size=31, stride=1, padding=15) - target
+            )
+        else:
+            spatial_weit = torch.ones_like(target)
+            
+        pred_sigmoid = torch.sigmoid(pred)
+        pred_flat = pred_sigmoid.contiguous().view(-1)
+        target_flat = target.contiguous().view(-1)
+        spatial_flat = spatial_weit.contiguous().view(-1)
+        
+        # Component losses
+        intersection = (pred_flat * target_flat * spatial_flat).sum()
+        dice_denominator = (pred_flat * spatial_flat).sum() + (target_flat * spatial_flat).sum()
+        dice_loss = 1 - (2.0 * intersection + self.smooth) / (dice_denominator + self.smooth)
+        
+        union = pred_flat * spatial_flat + target_flat * spatial_flat - pred_flat * target_flat * spatial_flat
+        iou_loss = 1 - (intersection + self.smooth) / (union.sum() + self.smooth)
+        
+        focal_loss_raw = self.focal_loss(pred, target)
+        focal_loss = focal_loss_raw.mean()
+        
+        return {
+            'dice_loss': dice_loss.item(),
+            'iou_loss': iou_loss.item(), 
+            'focal_loss': focal_loss.item(),
+            'total_loss': (self.dice_weight * dice_loss + 
+                          self.iou_weight * iou_loss + 
+                          self.focal_weight * focal_loss).item()
+        }
+
+
 def get_loss_function(loss_type='structure', **kwargs):
     """
     Factory function để tạo loss function theo type
@@ -314,6 +441,8 @@ def get_loss_function(loss_type='structure', **kwargs):
         return lambda pred, mask: UnifiedFocalLoss(**kwargs)(pred, mask)
     elif loss_type == 'focal':
         return lambda pred, mask: FocalLossV1(**kwargs)(pred, mask)
+    elif loss_type == 'dice_weighted_iou_focal':
+        return lambda pred, mask: DiceWeightedIoUFocalLoss(**kwargs)(pred, mask)
     else:
         raise ValueError(f"Unsupported loss type: {loss_type}")
 
@@ -463,6 +592,16 @@ def create_training_metadata(args, model, epoch, total_step, loss_record, dice, 
             'focal_gamma': args.focal_gamma,
             'focal_delta': args.focal_delta
         }
+    elif args.loss_type == 'dice_weighted_iou_focal':
+        metadata['loss_params'] = {
+            'dice_weight': args.dice_weight,
+            'iou_weight': args.iou_weight,
+            'focal_weight': args.focal_weight,
+            'focal_alpha': args.focal_alpha,
+            'focal_gamma': args.focal_gamma,
+            'smooth': args.smooth,
+            'spatial_weight': args.spatial_weight
+        }
     elif args.loss_type == 'boundary':
         metadata['loss_params'] = {
             'boundary_theta0': getattr(args, 'boundary_theta0', 3),
@@ -496,6 +635,16 @@ def train(train_loader, model, optimizer, epoch, lr_scheduler, args):
         loss_kwargs = {'alpha': args.combo_alpha}
     elif args.loss_type == 'unified_focal':
         loss_kwargs = {'gamma': args.focal_gamma, 'delta': args.focal_delta}
+    elif args.loss_type == 'dice_weighted_iou_focal':
+        loss_kwargs = {
+            'dice_weight': args.dice_weight,
+            'iou_weight': args.iou_weight,
+            'focal_weight': args.focal_weight,
+            'focal_alpha': args.focal_alpha,
+            'focal_gamma': args.focal_gamma,
+            'smooth': args.smooth,
+            'spatial_weight': args.spatial_weight
+        }
 
     with torch.autograd.set_detect_anomaly(False):  # Tắt anomaly detection
         for i, pack in enumerate(progress_bar, start=1):
@@ -655,6 +804,14 @@ def log_train_model_info(model, args, total_step):
     elif args.loss_type == 'unified_focal':
         logging.info(
             f"  - Unified Focal Loss (γ={args.focal_gamma}, δ={args.focal_delta})")
+    elif args.loss_type == 'dice_weighted_iou_focal':
+        logging.info(f"  - Dice Weighted IoU Focal Loss")
+        logging.info(f"    * Dice Weight: {args.dice_weight}")
+        logging.info(f"    * IoU Weight: {args.iou_weight}")
+        logging.info(f"    * Focal Weight: {args.focal_weight}")
+        logging.info(f"    * Focal Alpha: {args.focal_alpha}")
+        logging.info(f"    * Focal Gamma: {args.focal_gamma}")
+        logging.info(f"    * Spatial Weight: {args.spatial_weight}")
     elif args.loss_type == 'focal':
         logging.info(f"  - Focal Loss (γ={args.focal_gamma})")
 
@@ -692,6 +849,124 @@ def log_train_model_info(model, args, total_step):
     logging.info("="*60)
 
 
+def print_loss_recommendations():
+    """In ra các gợi ý hệ số và câu lệnh cho các loss function"""
+    print("\n" + "="*80)
+    print(" DICE WEIGHTED IOU FOCAL LOSS - GOI Y HE SO VA CAU LENH")
+    print("="*80)
+    
+    print("\nCAC HE SO GOI Y:")
+    print("-" * 50)
+    
+    # Polyp nhỏ - nhấn mạnh Dice
+    print("1. POLYP NHO (Small Polyps):")
+    print("   dice_weight=0.5, iou_weight=0.2, focal_weight=0.3")
+    print("   focal_alpha=0.25, focal_gamma=2.0")
+    print("   -> Tăng Dice để capture small objects tốt hơn")
+    
+    # Polyp lớn - cân bằng
+    print("\n2. POLYP LON (Large Polyps):")
+    print("   dice_weight=0.4, iou_weight=0.3, focal_weight=0.3")
+    print("   focal_alpha=0.25, focal_gamma=2.0")
+    print("   -> Cân bằng cả 3 thành phần")
+    
+    # Boundary phức tạp
+    print("\n3. RANH GIOI PHUC TAP (Complex Boundaries):")
+    print("   dice_weight=0.3, iou_weight=0.4, focal_weight=0.3")
+    print("   focal_alpha=0.25, focal_gamma=3.0")
+    print("   -> Tăng IoU weight và focal gamma")
+    
+    # Imbalanced dataset
+    print("\n4. DU LIEU IMBALANCED:")
+    print("   dice_weight=0.4, iou_weight=0.25, focal_weight=0.35")
+    print("   focal_alpha=0.5, focal_gamma=2.5")
+    print("   -> Tăng focal weight và alpha")
+    
+    print("\nCAU LENH CHAY CHI TIET:")
+    print("-" * 50)
+    
+    # Basic command
+    print("\n1. CAU LENH CO BAN:")
+    print("python train.py --loss_type dice_weighted_iou_focal --backbone b3 --num_epochs 20")
+    
+    # Small polyps
+    print("\n2. TOAN CAU CHO POLYP NHO:")
+    print("python train.py \\")
+    print("  --loss_type dice_weighted_iou_focal \\")
+    print("  --backbone b3 \\")
+    print("  --num_epochs 25 \\")
+    print("  --dice_weight 0.5 \\")
+    print("  --iou_weight 0.2 \\")
+    print("  --focal_weight 0.3 \\")
+    print("  --focal_alpha 0.25 \\")
+    print("  --focal_gamma 2.0 \\")
+    print("  --batchsize 16 \\")
+    print("  --init_lr 1e-4")
+    
+    # Complex boundaries
+    print("\n3. TOAN CAU CHO RANH GIOI PHUC TAP:")
+    print("python train.py \\")
+    print("  --loss_type dice_weighted_iou_focal \\") 
+    print("  --backbone b3 \\")
+    print("  --num_epochs 30 \\")
+    print("  --dice_weight 0.3 \\")
+    print("  --iou_weight 0.4 \\")
+    print("  --focal_weight 0.3 \\")
+    print("  --focal_alpha 0.25 \\")
+    print("  --focal_gamma 3.0 \\")
+    print("  --batchsize 12 \\")
+    print("  --init_lr 1e-4")
+    
+    # High performance setup
+    print("\n4. CAU HINH HIEU SUAT CAO:")
+    print("python train.py \\")
+    print("  --loss_type dice_weighted_iou_focal \\")
+    print("  --backbone b4 \\")
+    print("  --num_epochs 40 \\")
+    print("  --dice_weight 0.4 \\")
+    print("  --iou_weight 0.3 \\")
+    print("  --focal_weight 0.3 \\")
+    print("  --focal_alpha 0.3 \\")
+    print("  --focal_gamma 2.5 \\")
+    print("  --batchsize 8 \\")
+    print("  --init_lr 8e-5 \\")
+    print("  --init_trainsize 384")
+    
+    # Imbalanced dataset
+    print("\n5. DU LIEU IMBALANCED:")
+    print("python train.py \\")
+    print("  --loss_type dice_weighted_iou_focal \\")
+    print("  --backbone b3 \\")
+    print("  --num_epochs 35 \\")
+    print("  --dice_weight 0.4 \\")
+    print("  --iou_weight 0.25 \\")
+    print("  --focal_weight 0.35 \\")
+    print("  --focal_alpha 0.5 \\")
+    print("  --focal_gamma 2.5 \\")
+    print("  --batchsize 16")
+    
+    print("\nCHI TIET THAM SO:")
+    print("-" * 50)
+    print("dice_weight:   Trọng số Dice Loss (0.2-0.6) - Tốt cho small objects")
+    print("iou_weight:    Trọng số IoU Loss (0.2-0.5) - Tốt cho shape accuracy")  
+    print("focal_weight:  Trọng số Focal Loss (0.2-0.4) - Tốt cho hard examples")
+    print("focal_alpha:   Alpha Focal (0.25-0.75) - Cân bằng pos/neg")
+    print("focal_gamma:   Gamma Focal (1.5-3.0) - Focus on hard examples")
+    print("smooth:        Smoothing factor (1e-8 to 1e-4)")
+    print("spatial_weight: True/False - Có dùng spatial weighting không")
+    
+    print("\nKINH NGHIEM:")
+    print("-" * 50)
+    print("- Polyp nhỏ: Tăng dice_weight lên 0.5-0.6")
+    print("- Boundary phức tạp: Tăng iou_weight và focal_gamma")
+    print("- Dữ liệu imbalanced: Tăng focal_weight và focal_alpha")
+    print("- Tăng focal_gamma để focus vào hard examples")
+    print("- Giảm batch_size nếu model lớn (b4, b5)")
+    print("- spatial_weight=True thường cho kết quả tốt hơn")
+    
+    print("="*80)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--num_epochs', type=int,
@@ -724,12 +999,22 @@ if __name__ == '__main__':
                         default=2.0, help='gamma for Focal Loss')
     parser.add_argument('--focal_delta', type=float,
                         default=0.6, help='delta for Unified Focal Loss')
+    parser.add_argument('--dice_weight', type=float,
+                        default=0.4, help='dice_weight for Dice Weighted IoU Focal Loss')
+    parser.add_argument('--iou_weight', type=float,
+                        default=0.3, help='iou_weight for Dice Weighted IoU Focal Loss')
+    parser.add_argument('--focal_alpha', type=float,
+                        default=0.25, help='focal_alpha for Dice Weighted IoU Focal Loss')
+    parser.add_argument('--smooth', type=float,
+                        default=1e-6, help='smooth for Dice Weighted IoU Focal Loss')
+    parser.add_argument('--spatial_weight', type=bool,
+                        default=True, help='spatial_weight for Dice Weighted IoU Focal Loss')
     args = parser.parse_args()
 
     # Tự động tạo tên save nếu không được chỉ định
     if not args.train_save:
         args.train_save = generate_model_save_name(args)
-        print(f"🤖 Auto-generated save name: {args.train_save}")
+        print(f"Auto-generated save name: {args.train_save}")
 
     # Setup logging
     log_file = setup_train_logging('logs', args.train_save)
@@ -834,3 +1119,6 @@ if __name__ == '__main__':
     logging.info("="*60)
     logging.info(f"Final model saved in: {save_path}")
     logging.info(f"Final checkpoint: {save_path}final.pth")
+
+    # Print loss recommendations
+    print_loss_recommendations()
