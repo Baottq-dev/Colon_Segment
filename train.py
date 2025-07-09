@@ -1020,6 +1020,7 @@ def print_loss_recommendations():
     
     print("="*80)
 
+# python3 train.py --train_path ./Data/TrainDataset --backbone b3 --num_epochs 20 --batchsize 8 --init_lr 1e-4 --loss_type tversky --train_save tversky_epoch20
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -1133,7 +1134,7 @@ if __name__ == '__main__':
         auxiliary_head=None,
         train_cfg=dict(),
         test_cfg=dict(mode='whole'),
-        pretrained=None).cuda()
+        pretrained=f'pretrained/mit_{args.backbone}.pth').cuda()
 
     # Log model and training information
     log_train_model_info(model, args, total_step)
