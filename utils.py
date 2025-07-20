@@ -22,7 +22,13 @@ class AvgMeter(object):
         self.losses.append(val)
 
     def show(self):
-        return torch.mean(torch.stack(self.losses[np.maximum(len(self.losses)-self.num, 0):]))
+        values = self.losses[np.maximum(len(self.losses)-self.num, 0):]
+        if len(values) == 0:
+            return 0.0
+        if isinstance(values[0], float):
+            return sum(values) / len(values)
+        else:
+            return torch.mean(torch.stack(values))
     
     
 def clip_gradient(optimizer, grad_clip):

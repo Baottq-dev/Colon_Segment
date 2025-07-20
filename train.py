@@ -120,6 +120,14 @@ class FocalLossV1(nn.Module):
     def forward(self, logits, label):
         # compute loss
         logits = logits.float()  # use fp32 if logits is fp16
+        
+        # Fix shape mismatch (new code)
+        if logits.shape != label.shape:
+            if logits.ndim == 5 and label.ndim == 4:
+                logits = logits.squeeze(2)
+            elif logits.ndim == 4 and label.ndim == 5:
+                logits = logits.unsqueeze(2)
+        
         with torch.no_grad():
             alpha = torch.empty_like(logits).fill_(1 - self.alpha)
             alpha[label == 1] = self.alpha
@@ -1022,6 +1030,18 @@ def print_loss_recommendations():
 
 # python3 train.py --train_path ./Data/TrainDataset --backbone b3 --num_epochs 20 --batchsize 8 --init_lr 1e-4 --loss_type tversky --train_save tversky_epoch20
 
+# python3 train.py --train_path ./Data/TrainDataset --backbone b3 --num_epochs 20 --batchsize 8 --init_lr 1e-4 --loss_type combo 
+
+# python3 train.py --train_path ./Data/TrainDataset --backbone b3 --num_epochs 20 --batchsize 8 --init_lr 1e-4 --loss_type boundary  
+
+# python3 train.py --train_path ./Data/TrainDataset --backbone b3 --num_epochs 20 --batchsize 8 --init_lr 1e-4 --loss_type unified_focal --------continues
+
+# python3 train.py --train_path ./Data/TrainDataset --backbone b3 --num_epochs 20 --batchsize 8 --init_lr 1e-4 --loss_type focal
+
+# python test.py --weight snapshots/<RUN_NAME>/final.pth --test_path ./Data/TestDataset            
+
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--num_epochs', type=int,
@@ -1066,7 +1086,20 @@ if __name__ == '__main__':
                         default=1e-6, help='smooth for Dice Weighted IoU Focal Loss')
     parser.add_argument('--spatial_weight', type=bool,
                         default=True, help='spatial_weight for Dice Weighted IoU Focal Loss')
+    # --- New CLI arguments for architecture tuning ---
+    parser.add_argument('--ppm_scales', type=str,
+                        default='1,2,3,6',
+                        help='Comma-separated pooling scales for PPM module (e.g., "1,3,5,7")')
+    parser.add_argument('--cfp_d', type=int,
+                        default=8,
+                        help='Dilation rate "d" for CFP modules (ColonFormer).')
     args = parser.parse_args()
+
+    # Parse PPM scales into a tuple of ints once for reuse
+    try:
+        ppm_scales = tuple(int(s) for s in args.ppm_scales.split(',') if s.strip())
+    except ValueError:
+        raise ValueError(f"Invalid --ppm_scales value: {args.ppm_scales}. Provide comma-separated integers, e.g. '1,2,3,6'.")
 
     # Tự động tạo tên save nếu không được chỉ định
     if not args.train_save:
@@ -1121,6 +1154,7 @@ if __name__ == '__main__':
         style='pytorch'),
         decode_head=dict(
         type='UPerHead',
+        pool_scales=ppm_scales,  # use CLI-provided PPM scales
         in_channels=[64, 128, 320, 512],
         in_index=[0, 1, 2, 3],
         channels=128,
