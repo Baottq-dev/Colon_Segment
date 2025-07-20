@@ -1,0 +1,372 @@
+[
+  {
+    "timestamp": "2025-07-20 15:05:54",
+    "model_name": "ColonFormer-L",
+    "backbone": "b3",
+    "loss_type": "focal",
+    "epochs": 20,
+    "batch_size": "unknown",
+    "weight_file": "snapshots/_focal_ppm-scale-1-3-5-7/final.pth",
+    "total_images": 798,
+    "total_params": 52944528,
+    "test_time": 52.69004487991333,
+    "overall_metrics": {
+      "dice": 0.8247030064831353,
+      "miou": 0.7481651989415917,
+      "precision": 0.8693072505719643,
+      "recall": 0.8215598846294763
+    },
+    "dataset_metrics": {
+      "Kvasir": {
+        "miou": 0.8448483518328369,
+        "dice": 0.9056186728988977,
+        "precision": 0.9272875392396505,
+        "recall": 0.9006323078083379,
+        "images": 100,
+        "accuracy": 0.9896405281500276,
+        "f1_score": 0.9056186728988977,
+        "sensitivity": 0.9006323078083379,
+        "specificity": 0.9961863929936954
+      },
+      "ETIS-LaribPolypDB": {
+        "miou": 0.8334353113764061,
+        "dice": 0.8997882049142442,
+        "precision": 0.9273326943013666,
+        "recall": 0.885776477004545,
+        "images": 196,
+        "accuracy": 0.9908962188625206,
+        "f1_score": 0.8997882049142442,
+        "sensitivity": 0.885776477004545,
+        "specificity": 0.9962155734219905
+      },
+      "CVC-ColonDB": {
+        "miou": 0.6519652884886771,
+        "dice": 0.7416108037757145,
+        "precision": 0.7986527204215337,
+        "recall": 0.7513876651337356,
+        "images": 380,
+        "accuracy": 0.9680875813865065,
+        "f1_score": 0.7416108037757145,
+        "sensitivity": 0.7513876651337356,
+        "specificity": 0.9860040867917914
+      },
+      "CVC-ClinicDB": {
+        "miou": 0.8244159538531645,
+        "dice": 0.8939257305856055,
+        "precision": 0.9327576711194078,
+        "recall": 0.8828980757486613,
+        "images": 62,
+        "accuracy": 0.9842553704420874,
+        "f1_score": 0.8939257305856055,
+        "sensitivity": 0.8828980757486613,
+        "specificity": 0.9960127813206127
+      },
+      "CVC-300": {
+        "miou": 0.8389512296289561,
+        "dice": 0.8992857164896894,
+        "precision": 0.9650369096634779,
+        "recall": 0.8610395702226825,
+        "images": 60,
+        "accuracy": 0.9709484762388858,
+        "f1_score": 0.8992857164896894,
+        "sensitivity": 0.8610395702226825,
+        "specificity": 0.9942064699777663
+      }
+    }
+  },
+  {
+    "timestamp": "2025-07-20 15:59:46",
+    "model_name": "ColonFormer-L",
+    "backbone": "b3",
+    "loss_type": "structure",
+    "epochs": 20,
+    "batch_size": "unknown",
+    "weight_file": "snapshots/_structure_ppm-scale-1-3-5-7/final.pth",
+    "total_images": 798,
+    "total_params": 52944528,
+    "test_time": 55.50204944610596,
+    "overall_metrics": {
+      "dice": 0.841969178060919,
+      "miou": 0.7696675923522693,
+      "precision": 0.8377704643042704,
+      "recall": 0.8895380671510389
+    },
+    "dataset_metrics": {
+      "Kvasir": {
+        "miou": 0.864645498055308,
+        "dice": 0.919251875827966,
+        "precision": 0.8978814945048376,
+        "recall": 0.9597054125197615,
+        "images": 100,
+        "accuracy": 0.9928795680518847,
+        "f1_score": 0.919251875827966,
+        "sensitivity": 0.9597054125197615,
+        "specificity": 0.994602350983652
+      },
+      "ETIS-LaribPolypDB": {
+        "miou": 0.8506720025940159,
+        "dice": 0.9103859707947858,
+        "precision": 0.898772966744851,
+        "recall": 0.9377358174670882,
+        "images": 196,
+        "accuracy": 0.9886297340790429,
+        "f1_score": 0.9103859707947858,
+        "sensitivity": 0.9377358174670882,
+        "specificity": 0.9916300150421824
+      },
+      "CVC-ColonDB": {
+        "miou": 0.6765483145756617,
+        "dice": 0.7649651787512892,
+        "precision": 0.762828240831052,
+        "recall": 0.8381560309543805,
+        "images": 380,
+        "accuracy": 0.9664247490409228,
+        "f1_score": 0.7649651787512892,
+        "sensitivity": 0.8381560309543805,
+        "specificity": 0.9783665197150637
+      },
+      "CVC-ClinicDB": {
+        "miou": 0.8431544527294681,
+        "dice": 0.9080620071724427,
+        "precision": 0.8991940503110476,
+        "recall": 0.9372509868472381,
+        "images": 62,
+        "accuracy": 0.9844964519870086,
+        "f1_score": 0.9080620071724427,
+        "sensitivity": 0.9372509868472381,
+        "specificity": 0.991289882417422
+      },
+      "CVC-300": {
+        "miou": 0.8605756795862437,
+        "dice": 0.9090658977309578,
+        "precision": 0.9494736157874768,
+        "recall": 0.8912627193968369,
+        "images": 60,
+        "accuracy": 0.97360913825679,
+        "f1_score": 0.9090658977309578,
+        "sensitivity": 0.8912627193968369,
+        "specificity": 0.9917373378271085
+      }
+    }
+  },
+  {
+    "timestamp": "2025-07-20 16:58:59",
+    "model_name": "ColonFormer-L",
+    "backbone": "b3",
+    "loss_type": "structure",
+    "epochs": 20,
+    "batch_size": "unknown",
+    "weight_file": "snapshots/_structure_ppm-scale-1-3-5-7_cfp-4/final.pth",
+    "total_images": 798,
+    "total_params": 52944528,
+    "test_time": 61.61123013496399,
+    "overall_metrics": {
+      "dice": 0.8442041874942446,
+      "miou": 0.7738008876164882,
+      "precision": 0.8358450194866041,
+      "recall": 0.8993262306618423
+    },
+    "dataset_metrics": {
+      "Kvasir": {
+        "miou": 0.8650631369626073,
+        "dice": 0.92037221242954,
+        "precision": 0.9014960643508279,
+        "recall": 0.9565552211525251,
+        "images": 100,
+        "accuracy": 0.9931226594775042,
+        "f1_score": 0.92037221242954,
+        "sensitivity": 0.9565552211525251,
+        "specificity": 0.9948470623902333
+      },
+      "ETIS-LaribPolypDB": {
+        "miou": 0.8493870883909229,
+        "dice": 0.9116241289851124,
+        "precision": 0.8909772461001694,
+        "recall": 0.9497481045194698,
+        "images": 196,
+        "accuracy": 0.9915345916251064,
+        "f1_score": 0.9116241289851124,
+        "sensitivity": 0.9497481045194698,
+        "specificity": 0.9939407762587814
+      },
+      "CVC-ColonDB": {
+        "miou": 0.6876303520011604,
+        "dice": 0.7703338200353734,
+        "precision": 0.7663235428864072,
+        "recall": 0.851248558258757,
+        "images": 380,
+        "accuracy": 0.9679020599981313,
+        "f1_score": 0.7703338200353734,
+        "sensitivity": 0.851248558258757,
+        "specificity": 0.9802498798611459
+      },
+      "CVC-ClinicDB": {
+        "miou": 0.8266463866984765,
+        "dice": 0.8930373470085896,
+        "precision": 0.8842033688231042,
+        "recall": 0.9366414131959974,
+        "images": 62,
+        "accuracy": 0.9828518384672819,
+        "f1_score": 0.8930373470085896,
+        "sensitivity": 0.9366414131959974,
+        "specificity": 0.9899985955522002
+      },
+      "CVC-300": {
+        "miou": 0.8659219260221597,
+        "dice": 0.9144037328066139,
+        "precision": 0.9366603952621141,
+        "recall": 0.9051660285100326,
+        "images": 60,
+        "accuracy": 0.978005687197902,
+        "f1_score": 0.9144037328066139,
+        "sensitivity": 0.9051660285100326,
+        "specificity": 0.9887430339643531
+      }
+    }
+  },
+  {
+    "timestamp": "2025-07-20 17:49:39",
+    "model_name": "ColonFormer-L",
+    "backbone": "b3",
+    "loss_type": "dice_weighted_iou_focal",
+    "epochs": 20,
+    "batch_size": "unknown",
+    "weight_file": "snapshots/_dice_weighted_iou_focal_ppm-scale-1-3-5-7_cfp-4/final.pth",
+    "total_images": 798,
+    "total_params": 52944528,
+    "test_time": 52.303391218185425,
+    "overall_metrics": {
+      "dice": 0.8272230656339384,
+      "miou": 0.7544301177860696,
+      "precision": 0.8390299298793668,
+      "recall": 0.8581274131059216
+    },
+    "dataset_metrics": {
+      "Kvasir": {
+        "miou": 0.8655340251444343,
+        "dice": 0.9222640173417703,
+        "precision": 0.9139430022032202,
+        "recall": 0.944461047430297,
+        "images": 100,
+        "accuracy": 0.9906383167605639,
+        "f1_score": 0.9222640173417703,
+        "sensitivity": 0.944461047430297,
+        "specificity": 0.9961501356168201,
+        "component_losses": {
+          "dice_loss": 0.09985616981983185,
+          "iou_loss": 0.17415711939334869,
+          "focal_loss": 0.02175559393072035,
+          "total_loss": 0.09871628504246473,
+          "dice_contribution": 0.03994246792793274,
+          "iou_contribution": 0.0522471358180046,
+          "focal_contribution": 0.006526678179216106,
+          "weights": {
+            "dice_weight": 0.4,
+            "iou_weight": 0.3,
+            "focal_weight": 0.3
+          }
+        }
+      },
+      "ETIS-LaribPolypDB": {
+        "miou": 0.837045319159211,
+        "dice": 0.8994954543293271,
+        "precision": 0.8882640788318374,
+        "recall": 0.9268907940603514,
+        "images": 196,
+        "accuracy": 0.9902105333021399,
+        "f1_score": 0.8994954543293271,
+        "sensitivity": 0.9268907940603514,
+        "specificity": 0.9934751500284302,
+        "component_losses": {
+          "dice_loss": 0.12423651376549079,
+          "iou_loss": 0.2067863451583045,
+          "focal_loss": 0.026735753444919116,
+          "total_loss": 0.11975123925248579,
+          "dice_contribution": 0.04969460550619632,
+          "iou_contribution": 0.06203590354749135,
+          "focal_contribution": 0.008020726033475735,
+          "weights": {
+            "dice_weight": 0.4,
+            "iou_weight": 0.3,
+            "focal_weight": 0.3
+          }
+        }
+      },
+      "CVC-ColonDB": {
+        "miou": 0.6550162810532888,
+        "dice": 0.7421724481754067,
+        "precision": 0.7731028931699837,
+        "recall": 0.7806094877774796,
+        "images": 380,
+        "accuracy": 0.9658449495696858,
+        "f1_score": 0.7421724481754067,
+        "sensitivity": 0.7806094877774796,
+        "specificity": 0.9844099252737004,
+        "component_losses": {
+          "dice_loss": 0.272434716789346,
+          "iou_loss": 0.3725590218054621,
+          "focal_loss": 0.1275652799154877,
+          "total_loss": 0.2590111848457079,
+          "dice_contribution": 0.1089738867157384,
+          "iou_contribution": 0.11176770654163862,
+          "focal_contribution": 0.038269583974646304,
+          "weights": {
+            "dice_weight": 0.4,
+            "iou_weight": 0.3,
+            "focal_weight": 0.3
+          }
+        }
+      },
+      "CVC-ClinicDB": {
+        "miou": 0.8167390416285166,
+        "dice": 0.8864723595327322,
+        "precision": 0.866978653341678,
+        "recall": 0.9344250071264116,
+        "images": 62,
+        "accuracy": 0.9841986147436073,
+        "f1_score": 0.8864723595327322,
+        "sensitivity": 0.9344250071264116,
+        "specificity": 0.9917727753153428,
+        "component_losses": {
+          "dice_loss": 0.12184457048293083,
+          "iou_loss": 0.2057665874881129,
+          "focal_loss": 0.047443486614933895,
+          "total_loss": 0.12470085312041544,
+          "dice_contribution": 0.048737828193172336,
+          "iou_contribution": 0.06172997624643387,
+          "focal_contribution": 0.014233045984480167,
+          "weights": {
+            "dice_weight": 0.4,
+            "iou_weight": 0.3,
+            "focal_weight": 0.3
+          }
+        }
+      },
+      "CVC-300": {
+        "miou": 0.864615692373617,
+        "dice": 0.9101613165912296,
+        "precision": 0.942000807676577,
+        "recall": 0.9017169913731176,
+        "images": 60,
+        "accuracy": 0.9722874160632649,
+        "f1_score": 0.9101613165912296,
+        "sensitivity": 0.9017169913731176,
+        "specificity": 0.988214456861139,
+        "component_losses": {
+          "dice_loss": 0.11612411836783092,
+          "iou_loss": 0.18425077398618062,
+          "focal_loss": 0.0799442228245122,
+          "total_loss": 0.12570815173288186,
+          "dice_contribution": 0.04644964734713237,
+          "iou_contribution": 0.05527523219585418,
+          "focal_contribution": 0.02398326684735366,
+          "weights": {
+            "dice_weight": 0.4,
+            "iou_weight": 0.3,
+            "focal_weight": 0.3
+          }
+        }
+      }
+    }
+  }
+]
