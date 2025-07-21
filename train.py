@@ -29,16 +29,66 @@ from mmseg.models.segmentors import ColonFormer as UNet
 
 # Mapping backbone tới tên model
 BACKBONE_MODEL_MAPPING = {
+    # MiT backbones
     'b1': 'ColonFormer-XS',
     'b2': 'ColonFormer-S', 
     'b3': 'ColonFormer-L',
     'b4': 'ColonFormer-XL',
-    'b5': 'ColonFormer-XXL'
+    'b5': 'ColonFormer-XXL',
+    # Swin Transformer backbones
+    'swin_tiny': 'ColonFormer-Swin-T',
+    'swin_small': 'ColonFormer-Swin-S',
+    'swin_base': 'ColonFormer-Swin-B'
+}
+
+# Mapping backbone tới kích thước kênh đầu ra
+BACKBONE_CHANNELS = {
+    # MiT backbones
+    'b0': [32, 64, 160, 256],
+    'b1': [64, 128, 320, 512],
+    'b2': [64, 128, 320, 512],
+    'b3': [64, 128, 320, 512],
+    'b4': [64, 128, 320, 512],
+    'b5': [64, 128, 320, 512],
+    # Swin Transformer backbones
+    'swin_tiny': [96, 192, 384, 768],
+    'swin_small': [96, 192, 384, 768],
+    'swin_base': [128, 256, 512, 1024]
+}
+
+# Cấu hình cho Swin Transformer
+SWIN_CONFIGS = {
+    'swin_tiny': {
+        'embed_dims': 96,
+        'depths': [2, 2, 6, 2],
+        'num_heads': [3, 6, 12, 24],
+        'window_size': 7,
+    },
+    'swin_small': {
+        'embed_dims': 96,
+        'depths': [2, 2, 18, 2],
+        'num_heads': [3, 6, 12, 24],
+        'window_size': 7,
+    },
+    'swin_base': {
+        'embed_dims': 128,
+        'depths': [2, 2, 18, 2],
+        'num_heads': [4, 8, 16, 32],
+        'window_size': 7,
+    }
 }
 
 def get_model_name(backbone):
     """Lấy tên model từ backbone"""
     return BACKBONE_MODEL_MAPPING.get(backbone, f'ColonFormer-{backbone.upper()}')
+    
+def is_swin_backbone(backbone):
+    """Kiểm tra xem backbone có phải là Swin Transformer không"""
+    return backbone.startswith('swin_')
+    
+def get_backbone_channels(backbone):
+    """Lấy kích thước kênh đầu ra của backbone"""
+    return BACKBONE_CHANNELS.get(backbone, [64, 128, 320, 512])
 
 class Dataset(torch.utils.data.Dataset):
 
@@ -1034,20 +1084,44 @@ def print_loss_recommendations():
 
 # python3 train.py --train_path ./Data/TrainDataset --backbone b3 --num_epochs 20 --batchsize 8 --init_lr 1e-4 --loss_type boundary  
 
-# python3 train.py --train_path ./Data/TrainDataset --backbone b3 --num_epochs 20 --batchsize 8 --init_lr 1e-4 --loss_type unified_focal --------continues
+# python3 train.py --train_path ./Data/TrainDataset --backbone b3 --num_epochs 20 --batchsize 8 --init_lr 1e-4 --loss_type unified_focal 
 
-# python3 train.py --train_path ./Data/TrainDataset --backbone b3 --num_epochs 20 --batchsize 8 --init_lr 1e-4 --loss_type focal
+# python3 train.py --train_path ./Data/TrainDataset --backbone b3 --num_epochs 20 --batchsize 8 --init_lr 1e-4 --loss_type focal  
 
-# python test.py --weight snapshots/<RUN_NAME>/final.pth --test_path ./Data/TestDataset            
+# python3 train.py --train_path ./Data/TrainDataset --backbone b3 --num_epochs 20 --batchsize 8 --init_lr 1e-4 --loss_type focal --ppm_scales 1,3,5,7 --train_save _focal_ppm-scale-1-3-5-7 
+
+# python3 train.py --train_path ./Data/TrainDataset --backbone b3 --num_epochs 20 --batchsize 8 --init_lr 1e-4 --loss_type structure --ppm_scales 1,3,5,7 --train_save _structure_ppm-scale-1-3-5-7
 
 
+# python3 train.py --train_path ./Data/TrainDataset --backbone b3 --num_epochs 20 --batchsize 8 --init_lr 1e-4 --loss_type structure --ppm_scales 1,3,5,7 --train_save _structure_ppm-scale-1-3-5-7_cfp-4 --cfp_d 4
+
+# python3 train.py --train_path ./Data/TrainDataset --backbone b3 --num_epochs 20 --batchsize 8 --init_lr 1e-4 --loss_type dice_weighted_iou_focal --ppm_scales 1,3,5,7 --train_save _dice_weighted_iou_focal_ppm-scale-1-3-5-7_cfp-4 --cfp_d 4
+
+
+# -----------------------------------------
+
+# python3 test.py --weight snapshots/ColonFormer-L_b3_20ep_8bs_boundary_20250720_1100/final.pth --test_path ./Data/TestDataset        
+
+# python3 test.py --weight snapshots/ColonFormer-L_b3_20ep_8bs_combo_20250720_1004_a0.5/final.pth --test_path ./Data/TestDataset 
+
+# python3 test.py --weight snapshots/ColonFormer-L_b3_20ep_8bs_focal_20250720_1241_g2.0/final.pth --test_path ./Data/TestDataset  
+
+# python3 test.py --weight snapshots/ColonFormer-L_b3_20ep_8bs_unified_focal_20250720_1151_g2.0_d0.6/final.pth --test_path ./Data/TestDataset    
+
+# python3 test.py --weight snapshots/_focal_ppm-scale-1-3-5-7/final.pth --test_path ./Data/TestDataset
+
+# python3 test.py --weight snapshots/_structure_ppm-scale-1-3-5-7/final.pth --test_path ./Data/TestDataset
+
+# python3 test.py --weight snapshots/_structure_ppm-scale-1-3-5-7_cfp-4/final.pth --test_path ./Data/TestDataset
+
+# python3 test.py --weight snapshots/_dice_weighted_iou_focal_ppm-scale-1-3-5-7_cfp-4/final.pth --test_path ./Data/TestDataset
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--num_epochs', type=int,
                         default=20, help='epoch number')
     parser.add_argument('--backbone', type=str,
-                        default='b3', help='backbone version')
+                        default='b3', help='backbone version (b1-b5, swin_tiny, swin_small, swin_base)')
     parser.add_argument('--init_lr', type=float,
                         default=1e-4, help='learning rate')
     parser.add_argument('--batchsize', type=int,
@@ -1149,13 +1223,36 @@ if __name__ == '__main__':
     logging.info(f"Image size: {args.init_trainsize}x{args.init_trainsize}")
     logging.info("Training from scratch without pretrained weights.")
 
-    model = UNet(backbone=dict(
-        type='mit_{}'.format(args.backbone),
-        style='pytorch'),
+    # Xác định loại backbone và tạo cấu hình tương ứng
+    in_channels = get_backbone_channels(args.backbone)
+    
+    if is_swin_backbone(args.backbone):
+        # Swin Transformer backbone
+        swin_cfg = SWIN_CONFIGS[args.backbone]
+        backbone_cfg = dict(
+            type=args.backbone,  # swin_tiny, swin_small, swin_base
+            pretrain_img_size=224,
+            embed_dims=swin_cfg['embed_dims'],
+            depths=swin_cfg['depths'],
+            num_heads=swin_cfg['num_heads'],
+            window_size=swin_cfg['window_size'],
+            drop_path_rate=0.3,
+            patch_norm=True,
+        )
+        pretrained_path = f'pretrained/{args.backbone}_patch4_window7_224.pth'
+    else:
+        # MiT backbone (mặc định)
+        backbone_cfg = dict(
+            type='mit_{}'.format(args.backbone),
+            style='pytorch',
+        )
+        pretrained_path = f'pretrained/mit_{args.backbone}.pth'
+    
+    model = UNet(backbone=backbone_cfg,
         decode_head=dict(
         type='UPerHead',
         pool_scales=ppm_scales,  # use CLI-provided PPM scales
-        in_channels=[64, 128, 320, 512],
+        in_channels=in_channels,  # Tự động điều chỉnh theo loại backbone
         in_index=[0, 1, 2, 3],
         channels=128,
         dropout_ratio=0.1,
@@ -1168,7 +1265,7 @@ if __name__ == '__main__':
         auxiliary_head=None,
         train_cfg=dict(),
         test_cfg=dict(mode='whole'),
-        pretrained=f'pretrained/mit_{args.backbone}.pth').cuda()
+        pretrained=pretrained_path).cuda()
 
     # Log model and training information
     log_train_model_info(model, args, total_step)

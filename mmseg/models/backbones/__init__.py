@@ -11,9 +11,11 @@ from .cgnet import CGNet
 # from .vit import VisionTransformer
 
 from .mix_transformer import *
+from .swin_transformer import SwinTransformer, swin_tiny, swin_small, swin_base
 
 __all__ = [
     'CGNet',
     # 'FastSCNN', 'HRNet', 'MobileNetV2', 'MobileNetV3', 'ResNeSt', 'ResNet',
-    # 'ResNetV1c', 'ResNetV1d', 'ResNeXt', 'UNet', 'VisionTransformer'
+    # 'ResNetV1c', 'ResNetV1d', 'ResNeXt', 'UNet', 'VisionTransformer',
+    'SwinTransformer', 'swin_tiny', 'swin_small', 'swin_base'
 ]

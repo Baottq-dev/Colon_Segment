@@ -176,17 +176,67 @@ def calculate_confidence_intervals(scores, confidence=0.95):
 
 # Mapping backbone tới tên model
 BACKBONE_MODEL_MAPPING = {
+    # MiT backbones
     'b1': 'ColonFormer-XS',
     'b2': 'ColonFormer-S',
     'b3': 'ColonFormer-L',
     'b4': 'ColonFormer-XL',
-    'b5': 'ColonFormer-XXL'
+    'b5': 'ColonFormer-XXL',
+    # Swin Transformer backbones
+    'swin_tiny': 'ColonFormer-Swin-T',
+    'swin_small': 'ColonFormer-Swin-S',
+    'swin_base': 'ColonFormer-Swin-B'
+}
+
+# Mapping backbone tới kích thước kênh đầu ra
+BACKBONE_CHANNELS = {
+    # MiT backbones
+    'b0': [32, 64, 160, 256],
+    'b1': [64, 128, 320, 512],
+    'b2': [64, 128, 320, 512],
+    'b3': [64, 128, 320, 512],
+    'b4': [64, 128, 320, 512],
+    'b5': [64, 128, 320, 512],
+    # Swin Transformer backbones
+    'swin_tiny': [96, 192, 384, 768],
+    'swin_small': [96, 192, 384, 768],
+    'swin_base': [128, 256, 512, 1024]
+}
+
+# Cấu hình cho Swin Transformer
+SWIN_CONFIGS = {
+    'swin_tiny': {
+        'embed_dims': 96,
+        'depths': [2, 2, 6, 2],
+        'num_heads': [3, 6, 12, 24],
+        'window_size': 7,
+    },
+    'swin_small': {
+        'embed_dims': 96,
+        'depths': [2, 2, 18, 2],
+        'num_heads': [3, 6, 12, 24],
+        'window_size': 7,
+    },
+    'swin_base': {
+        'embed_dims': 128,
+        'depths': [2, 2, 18, 2],
+        'num_heads': [4, 8, 16, 32],
+        'window_size': 7,
+    }
 }
 
 
 def get_model_name(backbone):
     """Lấy tên model từ backbone"""
     return BACKBONE_MODEL_MAPPING.get(backbone, f'ColonFormer-{backbone.upper()}')
+    
+def is_swin_backbone(backbone):
+    """Kiểm tra xem backbone có phải là Swin Transformer không"""
+    return backbone.startswith('swin_')
+    
+def get_backbone_channels(backbone):
+    """Lấy kích thước kênh đầu ra của backbone"""
+    return BACKBONE_CHANNELS.get(backbone, [64, 128, 320, 512])
 
 
 def setup_logging(log_dir='logs', test_dataset='all'):
@@ -223,7 +273,7 @@ def log_model_info(model, args):
 
     # Thông tin architecture
     logging.info(f"Decode Head: UPerHead")
-    logging.info(f"Input Channels: [64, 128, 320, 512]")
+    logging.info(f"Input Channels: {get_backbone_channels(args.backbone)}")
     logging.info(f"Decoder Channels: 128")
     logging.info(f"Dropout Ratio: 0.1")
     logging.info(f"Number of Classes: 1 (Binary Segmentation)")
@@ -1744,7 +1794,7 @@ def scan_snapshots_and_auto_test(args):
 def main():
     """Main function with option to display all results"""
     parser = argparse.ArgumentParser()
-    parser.add_argument('--backbone', type=str, default='b3')
+    parser.add_argument('--backbone', type=str, default='b3', help='backbone version (b1-b5, swin_tiny, swin_small, swin_base)')
     parser.add_argument('--weight', type=str, default='')
     parser.add_argument('--test_path', type=str, default='./data/TestDataset', help='path to dataset')
     parser.add_argument('--test_dataset', type=str, default='all', help='specific test dataset')
@@ -1801,12 +1851,33 @@ def main():
     logging.info(
         f"Weight file: {args.weight if args.weight else 'None (Random weights)'}")
 
-    model = UNet(backbone=dict(
-        type='mit_{}'.format(args.backbone),
-        style='pytorch'),
+    # Xác định loại backbone và tạo cấu hình tương ứng
+    in_channels = get_backbone_channels(args.backbone)
+    
+    if is_swin_backbone(args.backbone):
+        # Swin Transformer backbone
+        swin_cfg = SWIN_CONFIGS[args.backbone]
+        backbone_cfg = dict(
+            type=args.backbone,  # swin_tiny, swin_small, swin_base
+            pretrain_img_size=224,
+            embed_dims=swin_cfg['embed_dims'],
+            depths=swin_cfg['depths'],
+            num_heads=swin_cfg['num_heads'],
+            window_size=swin_cfg['window_size'],
+            drop_path_rate=0.3,
+            patch_norm=True,
+        )
+    else:
+        # MiT backbone (mặc định)
+        backbone_cfg = dict(
+            type='mit_{}'.format(args.backbone),
+            style='pytorch',
+        )
+    
+    model = UNet(backbone=backbone_cfg,
         decode_head=dict(
         type='UPerHead',
-        in_channels=[64, 128, 320, 512],
+        in_channels=in_channels,  # Tự động điều chỉnh theo loại backbone
         in_index=[0, 1, 2, 3],
         channels=128,
         dropout_ratio=0.1,
