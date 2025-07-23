@@ -12,11 +12,39 @@ import numpy as np
 from functools import partial
 
 from mmcv.cnn import build_norm_layer
+
+# Xử lý các phiên bản MMCV khác nhau
+BaseModule = None
 try:
+    # Thử import từ mmcv.runner (MMCV 1.x)
     from mmcv.runner import BaseModule
-except ImportError:  # Hỗ trợ mmcv phiên bản cũ
-    from mmcv.runner.base_module import BaseModule
-from mmcv.cnn.utils.weight_init import trunc_normal_
+except ImportError:
+    try:
+        # Thử import từ mmcv.runner.base_module (MMCV 1.x khác cấu trúc)
+        from mmcv.runner.base_module import BaseModule
+    except ImportError:
+        try:
+            # Thử import từ mmengine.model (MMCV 2.x / MMEngine)
+            from mmengine.model import BaseModule
+        except ImportError:
+            # Fallback: tạo BaseModule đơn giản nếu không import được
+            class BaseModule(nn.Module):
+                def __init__(self, init_cfg=None):
+                    super(BaseModule, self).__init__()
+                    self.init_cfg = init_cfg
+
+# Cố gắng import trunc_normal_ từ các vị trí có thể có
+try:
+    from mmcv.cnn.utils.weight_init import trunc_normal_
+except ImportError:
+    try:
+        from mmcv.cnn import trunc_normal_
+    except ImportError:
+        # Fallback nếu không import được
+        def trunc_normal_(tensor, mean=0., std=1., a=-2., b=2.):
+            # Định nghĩa trunc_normal_ đơn giản
+            with torch.no_grad():
+                return tensor.normal_(mean, std).clamp_(min=a, max=b)
 
 from ..builder import BACKBONES
 
@@ -90,7 +118,11 @@ class WindowAttention(nn.Module):
         # Get pair-wise relative position index for each token inside the window
         coords_h = torch.arange(self.window_size[0])
         coords_w = torch.arange(self.window_size[1])
-        coords = torch.stack(torch.meshgrid([coords_h, coords_w]))  # 2, Wh, Ww
+        # Xử lý sự khác biệt giữa các phiên bản PyTorch trong meshgrid
+        try:
+            coords = torch.stack(torch.meshgrid([coords_h, coords_w], indexing='ij'))  # PyTorch 1.10+
+        except:
+            coords = torch.stack(torch.meshgrid([coords_h, coords_w]))  # PyTorch cũ
         coords_flatten = torch.flatten(coords, 1)  # 2, Wh*Ww
         relative_coords = coords_flatten[:, :, None] - coords_flatten[:, None, :]  # 2, Wh*Ww, Wh*Ww
         relative_coords = relative_coords.permute(1, 2, 0).contiguous()  # Wh*Ww, Wh*Ww, 2

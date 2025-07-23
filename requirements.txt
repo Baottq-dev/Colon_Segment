@@ -54,8 +54,9 @@ numpy==1.26.4
 tqdm>=4.62.0
 scipy>=1.7.0
 
-# MMCV
+# MMCV and MMEngine
 mmcv==2.2.0
+mmengine>=0.7.0
 
 # Development tools (optional)
 tensorboard>=2.7.0
