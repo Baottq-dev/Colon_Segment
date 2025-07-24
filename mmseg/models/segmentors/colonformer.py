@@ -95,12 +95,15 @@ class ColonFormer(nn.Module):
         # ------------------- atten-one -----------------------
         decoder_2 = F.interpolate(decoder_1, scale_factor=0.125, mode='bilinear')
         cfp_out_1 = self.CFP_3(x4)
+        print(f"Debug - cfp_out_1 shape: {cfp_out_1.shape}")
         # cfp_out_1 += x4
         decoder_2_ra = -1*(torch.sigmoid(decoder_2)) + 1
         # Đảm bảo sử dụng cfp_out_1 mới nhất cho aa_kernel_3
         aa_atten_3 = self.aa_kernel_3(cfp_out_1)
-        # Không cộng trực tiếp, tạo bản sao của cfp_out_1
-        aa_atten_3 = aa_atten_3 + cfp_out_1.clone()
+        print(f"Debug - aa_atten_3 shape after AA_kernel: {aa_atten_3.shape}")
+        # Không sử dụng phép cộng trực tiếp nữa, thay vào đó là gán giá trị mới
+        aa_atten_3 = aa_atten_3 + cfp_out_1
+        print(f"Debug - aa_atten_3 shape after addition: {aa_atten_3.shape}")
         # Lấy số kênh từ cfp_out_1
         _, c4_out, _, _ = cfp_out_1.shape
         aa_atten_3_o = decoder_2_ra.expand(-1, c4_out, -1, -1).mul(aa_atten_3)
@@ -115,11 +118,14 @@ class ColonFormer(nn.Module):
         # ------------------- atten-two -----------------------      
         decoder_3 = F.interpolate(x_3, scale_factor=2, mode='bilinear')
         cfp_out_2 = self.CFP_2(x3)
+        print(f"Debug - cfp_out_2 shape: {cfp_out_2.shape}")
         # cfp_out_2 += x3
         decoder_3_ra = -1*(torch.sigmoid(decoder_3)) + 1
         aa_atten_2 = self.aa_kernel_2(cfp_out_2)
-        # Không cộng trực tiếp, tạo bản sao của cfp_out_2
-        aa_atten_2 = aa_atten_2 + cfp_out_2.clone()
+        print(f"Debug - aa_atten_2 shape after AA_kernel: {aa_atten_2.shape}")
+        # Không sử dụng phép cộng trực tiếp nữa
+        aa_atten_2 = aa_atten_2 + cfp_out_2
+        print(f"Debug - aa_atten_2 shape after addition: {aa_atten_2.shape}")
         # Lấy số kênh từ cfp_out_2
         _, c3_out, _, _ = cfp_out_2.shape
         aa_atten_2_o = decoder_3_ra.expand(-1, c3_out, -1, -1).mul(aa_atten_2)
@@ -134,11 +140,14 @@ class ColonFormer(nn.Module):
         # ------------------- atten-three -----------------------
         decoder_4 = F.interpolate(x_2, scale_factor=2, mode='bilinear')
         cfp_out_3 = self.CFP_1(x2)
+        print(f"Debug - cfp_out_3 shape: {cfp_out_3.shape}")
         # cfp_out_3 += x2
         decoder_4_ra = -1*(torch.sigmoid(decoder_4)) + 1
         aa_atten_1 = self.aa_kernel_1(cfp_out_3)
-        # Không cộng trực tiếp, tạo bản sao của cfp_out_3
-        aa_atten_1 = aa_atten_1 + cfp_out_3.clone()
+        print(f"Debug - aa_atten_1 shape after AA_kernel: {aa_atten_1.shape}")
+        # Không sử dụng phép cộng trực tiếp nữa
+        aa_atten_1 = aa_atten_1 + cfp_out_3
+        print(f"Debug - aa_atten_1 shape after addition: {aa_atten_1.shape}")
         # Lấy số kênh từ cfp_out_3
         _, c2_out, _, _ = cfp_out_3.shape
         aa_atten_1_o = decoder_4_ra.expand(-1, c2_out, -1, -1).mul(aa_atten_1)

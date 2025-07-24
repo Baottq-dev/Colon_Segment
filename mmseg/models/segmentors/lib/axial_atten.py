@@ -37,18 +37,22 @@ class AA_kernel(nn.Module):
         # Kiểm tra xem kích thước kênh đầu vào có thay đổi hay không
         if x.size(1) != self.in_channel:
             print(f"AA_kernel: Auto-adjusting for channel size change: {self.in_channel} -> {x.size(1)}")
+            # Luôn cập nhật cả kênh vào và ra để đảm bảo tính nhất quán
+            self.out_channel = x.size(1)
             self.in_channel = x.size(1)
-            # Điều chỉnh kênh ra nếu trước đây nó bằng kênh vào
-            if self.out_channel == self.in_channel:
-                self.out_channel = x.size(1)
             # Tạo lại các lớp trên cùng device với input
             self._init_layers(device=x.device)
             
+        print(f"AA_kernel input shape: {x.shape}")
         x = self.conv0(x)
+        print(f"AA_kernel after conv0: {x.shape}")
         x = self.conv1(x)
+        print(f"AA_kernel after conv1: {x.shape}")
 
         Hx = self.Hattn(x)
+        print(f"AA_kernel after Hattn: {Hx.shape}")
         Wx = self.Wattn(Hx)
+        print(f"AA_kernel after Wattn (final output): {Wx.shape}")
 
         return Wx
         
