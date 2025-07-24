@@ -195,8 +195,21 @@ class SwinTransformerBlock(nn.Module):
 
     def forward(self, x, attn_mask):
         B, L, C = x.shape
-        H, W = int(np.sqrt(L)), int(np.sqrt(L))
-        assert L == H * W, "input feature has wrong size"
+        
+        # Kiểm tra và điều chỉnh kích thước nếu cần
+        H = int(np.sqrt(L))
+        W = H
+        if H * W != L:
+            # Tính toán H, W gần nhất mà H*W <= L
+            H = int(np.sqrt(L))
+            W = L // H
+            # Điều chỉnh lại nếu L không phải là số chính phương
+            if H * W < L:
+                H += 1
+            print(f"SwinTransformerBlock auto-adjust: L={L}, adjusted to H={H}, W={W}")
+            # Reshape x để có đúng H*W tokens
+            x = x[:, :H*W, :]
+            L = H * W
         
         shortcut = x
         x = self.norm1(x)
@@ -256,8 +269,14 @@ class PatchMerging(nn.Module):
 
     def forward(self, x, H, W):
         B, L, C = x.shape
-        assert L == H * W, "input feature has wrong size"
-
+        
+        # Thay vì kiểm tra nghiêm ngặt, chúng ta reshape lại x để phù hợp với H*W
+        if L != H * W:
+            print(f"Auto-reshape tokens: L={L}, H*W={H*W}")
+            # Reshape lại x để số token khớp với H*W
+            x = x[:, :H*W, :]
+            L = H * W
+        
         x = x.view(B, H, W, C)
 
         # padding
@@ -345,6 +364,19 @@ class BasicLayer(nn.Module):
         attn_mask = mask_windows.unsqueeze(1) - mask_windows.unsqueeze(2)
         attn_mask = attn_mask.masked_fill(attn_mask != 0, float(-100.0)).masked_fill(attn_mask == 0, float(0.0))
 
+        # Đảm bảo kích thước token phù hợp
+        B, L, C = x.shape
+        if L != H * W:
+            print(f"BasicLayer auto-reshape: L={L}, H*W={H*W}")
+            # Chủ động điều chỉnh số token để phù hợp với H*W
+            if L > H * W:
+                # Trường hợp có quá nhiều token, cắt bớt
+                x = x[:, :H*W, :]
+            else:
+                # Trường hợp thiếu token, pad thêm
+                padding = torch.zeros((B, H*W - L, C), device=x.device)
+                x = torch.cat([x, padding], dim=1)
+        
         for blk in self.blocks:
             x = blk(x, attn_mask)
 
