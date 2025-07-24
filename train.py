@@ -90,13 +90,15 @@ def get_backbone_channels(backbone):
     """Lấy kích thước kênh đầu ra của backbone"""
     return BACKBONE_CHANNELS.get(backbone, [64, 128, 320, 512])
 
+# 1. Sửa class Dataset để nhận tham số trainsize
 class Dataset(torch.utils.data.Dataset):
 
-    def __init__(self, img_paths, mask_paths, aug=True, transform=None):
+    def __init__(self, img_paths, mask_paths, trainsize=352, aug=True, transform=None):
         self.img_paths = img_paths
         self.mask_paths = mask_paths
         self.aug = aug
         self.transform = transform
+        self.trainsize = trainsize
 
     def __len__(self):
         return len(self.img_paths)
@@ -112,9 +114,10 @@ class Dataset(torch.utils.data.Dataset):
             augmented = self.transform(image=image, mask=mask)
             image = augmented['image']
             mask = augmented['mask']
-        else:
-            image = cv2.resize(image, (352, 352))
-            mask = cv2.resize(mask, (352, 352))
+            
+        # Luôn resize về đúng kích thước cuối cùng
+        image = cv2.resize(image, (self.trainsize, self.trainsize))
+        mask = cv2.resize(mask, (self.trainsize, self.trainsize))
 
         image = image.astype('float32') / 255
         image = image.transpose((2, 0, 1))
@@ -1175,6 +1178,10 @@ if __name__ == '__main__':
     except ValueError:
         raise ValueError(f"Invalid --ppm_scales value: {args.ppm_scales}. Provide comma-separated integers, e.g. '1,2,3,6'.")
 
+    # Tự động set args.init_trainsize = 224 nếu dùng backbone Swin, còn lại giữ nguyên logic. Đặt đoạn này sau khi parse args và trước khi tạo Dataset.
+    if is_swin_backbone(args.backbone):
+        args.init_trainsize = 224
+
     # Tự động tạo tên save nếu không được chỉ định
     if not args.train_save:
         args.train_save = generate_model_save_name(args)
@@ -1203,7 +1210,12 @@ if __name__ == '__main__':
     train_img_paths.sort()
     train_mask_paths.sort()
 
-    train_dataset = Dataset(train_img_paths, train_mask_paths)
+    # 2. Sửa phần khởi tạo Dataset để truyền đúng trainsize
+    train_dataset = Dataset(
+        train_img_paths, 
+        train_mask_paths, 
+        trainsize=args.init_trainsize
+    )
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=args.batchsize,
@@ -1243,7 +1255,7 @@ if __name__ == '__main__':
     else:
         # MiT backbone (mặc định)
         backbone_cfg = dict(
-            type='mit_{}'.format(args.backbone),
+        type='mit_{}'.format(args.backbone),
             style='pytorch',
         )
         pretrained_path = f'pretrained/mit_{args.backbone}.pth'

@@ -381,12 +381,16 @@ class PatchEmbed(nn.Module):
     def forward(self, x):
         B, C, H, W = x.shape
         # FIXME look at relaxing size constraints
-        assert H == self.img_size[0] and W == self.img_size[1], \
-            f"Input image size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
+        # Thay vì kiểm tra chặt chẽ, hãy tự động resize nếu kích thước không khớp
+        if H != self.img_size[0] or W != self.img_size[1]:
+            import torch.nn.functional as F
+            x = F.interpolate(x, size=(self.img_size[0], self.img_size[1]), mode='bilinear', align_corners=False)
+            print(f"Auto-resized input from {H}x{W} to {self.img_size[0]}x{self.img_size[1]}")
+        
         x = self.proj(x).flatten(2).transpose(1, 2)  # B Ph*Pw C
         if self.norm is not None:
             x = self.norm(x)
-        return x, H // self.patch_size[0], W // self.patch_size[1]
+        return x, self.img_size[0] // self.patch_size[0], self.img_size[1] // self.patch_size[1]
 
 
 @BACKBONES.register_module()
@@ -552,37 +556,16 @@ class SwinTransformer(BaseModule):
 @BACKBONES.register_module()
 class swin_tiny(SwinTransformer):
     def __init__(self, **kwargs):
-        super(swin_tiny, self).__init__(
-            embed_dims=96,
-            depths=[2, 2, 6, 2],
-            num_heads=[3, 6, 12, 24],
-            window_size=7,
-            drop_path_rate=0.3,
-            patch_norm=True,
-            **kwargs)
+        super(swin_tiny, self).__init__(**kwargs)
 
 
 @BACKBONES.register_module()
 class swin_small(SwinTransformer):
     def __init__(self, **kwargs):
-        super(swin_small, self).__init__(
-            embed_dims=96,
-            depths=[2, 2, 18, 2],
-            num_heads=[3, 6, 12, 24],
-            window_size=7,
-            drop_path_rate=0.3,
-            patch_norm=True,
-            **kwargs)
+        super(swin_small, self).__init__(**kwargs)
 
 
 @BACKBONES.register_module()
 class swin_base(SwinTransformer):
     def __init__(self, **kwargs):
-        super(swin_base, self).__init__(
-            embed_dims=128,
-            depths=[2, 2, 18, 2],
-            num_heads=[4, 8, 16, 32],
-            window_size=7,
-            drop_path_rate=0.3,
-            patch_norm=True,
-            **kwargs) 
+        super(swin_base, self).__init__(**kwargs) 
