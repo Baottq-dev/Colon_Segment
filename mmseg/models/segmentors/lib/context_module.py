@@ -23,7 +23,7 @@ class CFPModule(nn.Module):
         # Khởi tạo các layers
         self._init_layers()
         
-    def _init_layers(self):
+    def _init_layers(self, device=None):
         """Khởi tạo hoặc tái tạo tất cả các lớp dựa trên tham số hiện tại"""
         nIn = self.nIn
         d = self.d
@@ -71,13 +71,33 @@ class CFPModule(nn.Module):
                             dilation=(int(d/2+1),int(d/2+1)), groups = nIn //16, bn_acti=True)
         
         self.conv1x1 = Conv(nIn, nIn, 1, 1, padding=0, bn_acti=False)
+        
+        # Chuyển tất cả các layers tới device chỉ định
+        if device is not None:
+            self.bn_relu_1.to(device)
+            self.bn_relu_2.to(device)
+            self.conv1x1_1.to(device)
+            self.dconv_4_1.to(device)
+            self.dconv_4_2.to(device)
+            self.dconv_4_3.to(device)
+            self.dconv_1_1.to(device)
+            self.dconv_1_2.to(device)
+            self.dconv_1_3.to(device)
+            self.dconv_2_1.to(device)
+            self.dconv_2_2.to(device)
+            self.dconv_2_3.to(device)
+            self.dconv_3_1.to(device)
+            self.dconv_3_2.to(device)
+            self.dconv_3_3.to(device)
+            self.conv1x1.to(device)
     
     def forward(self, input):
         # Kiểm tra xem kích thước kênh đầu vào có thay đổi hay không
         if input.size(1) != self.nIn:
             print(f"CFPModule: Auto-adjusting for channel size change: {self.nIn} -> {input.size(1)}")
             self.nIn = input.size(1)
-            self._init_layers()  # Khởi tạo lại các lớp với kích thước kênh mới
+            # Tạo lại các lớp trên cùng device với input
+            self._init_layers(device=input.device)  # Khởi tạo lại các lớp với kích thước kênh mới
             
         inp = self.bn_relu_1(input)
         inp = self.conv1x1_1(inp)
