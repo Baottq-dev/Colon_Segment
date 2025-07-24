@@ -93,11 +93,17 @@ class ColonFormer(nn.Module):
         lateral_map_1 = F.interpolate(decoder_1, scale_factor=4, mode='bilinear')
         
         # ------------------- atten-one -----------------------
-        decoder_2 = F.interpolate(decoder_1, scale_factor=0.125, mode='bilinear')
+        # Thay vì sử dụng scale_factor cố định, resize theo kích thước của feature map x4
         cfp_out_1 = self.CFP_3(x4)
-        print(f"Debug - cfp_out_1 shape: {cfp_out_1.shape}")
-        # cfp_out_1 += x4
+        print(f"Debug - cfp_out_1 shape: {cfp_out_1.shape}, x4 shape: {x4.shape}")
+        
+        # Resize decoder_1 về cùng kích thước không gian với cfp_out_1
+        decoder_2 = F.interpolate(decoder_1, size=cfp_out_1.shape[2:], mode='bilinear', align_corners=False)
+        print(f"Debug - decoder_2 shape: {decoder_2.shape}")
+        
         decoder_2_ra = -1*(torch.sigmoid(decoder_2)) + 1
+        print(f"Debug - decoder_2_ra shape: {decoder_2_ra.shape}")
+        
         # Đảm bảo sử dụng cfp_out_1 mới nhất cho aa_kernel_3
         aa_atten_3 = self.aa_kernel_3(cfp_out_1)
         print(f"Debug - aa_atten_3 shape after AA_kernel: {aa_atten_3.shape}")
@@ -107,20 +113,26 @@ class ColonFormer(nn.Module):
         # Lấy số kênh từ cfp_out_1
         _, c4_out, _, _ = cfp_out_1.shape
         aa_atten_3_o = decoder_2_ra.expand(-1, c4_out, -1, -1).mul(aa_atten_3)
+        print(f"Debug - aa_atten_3_o shape: {aa_atten_3_o.shape}")
         
         ra_3 = self.ra3_conv1(aa_atten_3_o) 
         ra_3 = self.ra3_conv2(ra_3) 
         ra_3 = self.ra3_conv3(ra_3) 
         
         x_3 = ra_3 + decoder_2
-        lateral_map_2 = F.interpolate(x_3,scale_factor=32,mode='bilinear')
+        lateral_map_2 = F.interpolate(x_3, scale_factor=32, mode='bilinear')
         
         # ------------------- atten-two -----------------------      
-        decoder_3 = F.interpolate(x_3, scale_factor=2, mode='bilinear')
         cfp_out_2 = self.CFP_2(x3)
-        print(f"Debug - cfp_out_2 shape: {cfp_out_2.shape}")
-        # cfp_out_2 += x3
+        print(f"Debug - cfp_out_2 shape: {cfp_out_2.shape}, x3 shape: {x3.shape}")
+        
+        # Resize x_3 về cùng kích thước không gian với cfp_out_2
+        decoder_3 = F.interpolate(x_3, size=cfp_out_2.shape[2:], mode='bilinear', align_corners=False)
+        print(f"Debug - decoder_3 shape: {decoder_3.shape}")
+        
         decoder_3_ra = -1*(torch.sigmoid(decoder_3)) + 1
+        print(f"Debug - decoder_3_ra shape: {decoder_3_ra.shape}")
+        
         aa_atten_2 = self.aa_kernel_2(cfp_out_2)
         print(f"Debug - aa_atten_2 shape after AA_kernel: {aa_atten_2.shape}")
         # Không sử dụng phép cộng trực tiếp nữa
@@ -129,20 +141,26 @@ class ColonFormer(nn.Module):
         # Lấy số kênh từ cfp_out_2
         _, c3_out, _, _ = cfp_out_2.shape
         aa_atten_2_o = decoder_3_ra.expand(-1, c3_out, -1, -1).mul(aa_atten_2)
+        print(f"Debug - aa_atten_2_o shape: {aa_atten_2_o.shape}")
         
         ra_2 = self.ra2_conv1(aa_atten_2_o) 
         ra_2 = self.ra2_conv2(ra_2) 
         ra_2 = self.ra2_conv3(ra_2) 
         
         x_2 = ra_2 + decoder_3
-        lateral_map_3 = F.interpolate(x_2,scale_factor=16,mode='bilinear')        
+        lateral_map_3 = F.interpolate(x_2, scale_factor=16, mode='bilinear')        
         
         # ------------------- atten-three -----------------------
-        decoder_4 = F.interpolate(x_2, scale_factor=2, mode='bilinear')
         cfp_out_3 = self.CFP_1(x2)
-        print(f"Debug - cfp_out_3 shape: {cfp_out_3.shape}")
-        # cfp_out_3 += x2
+        print(f"Debug - cfp_out_3 shape: {cfp_out_3.shape}, x2 shape: {x2.shape}")
+        
+        # Resize x_2 về cùng kích thước không gian với cfp_out_3
+        decoder_4 = F.interpolate(x_2, size=cfp_out_3.shape[2:], mode='bilinear', align_corners=False)
+        print(f"Debug - decoder_4 shape: {decoder_4.shape}")
+        
         decoder_4_ra = -1*(torch.sigmoid(decoder_4)) + 1
+        print(f"Debug - decoder_4_ra shape: {decoder_4_ra.shape}")
+        
         aa_atten_1 = self.aa_kernel_1(cfp_out_3)
         print(f"Debug - aa_atten_1 shape after AA_kernel: {aa_atten_1.shape}")
         # Không sử dụng phép cộng trực tiếp nữa
@@ -151,12 +169,13 @@ class ColonFormer(nn.Module):
         # Lấy số kênh từ cfp_out_3
         _, c2_out, _, _ = cfp_out_3.shape
         aa_atten_1_o = decoder_4_ra.expand(-1, c2_out, -1, -1).mul(aa_atten_1)
+        print(f"Debug - aa_atten_1_o shape: {aa_atten_1_o.shape}")
         
         ra_1 = self.ra1_conv1(aa_atten_1_o) 
         ra_1 = self.ra1_conv2(ra_1) 
         ra_1 = self.ra1_conv3(ra_1) 
         
         x_1 = ra_1 + decoder_4
-        lateral_map_5 = F.interpolate(x_1,scale_factor=8,mode='bilinear') 
+        lateral_map_5 = F.interpolate(x_1, scale_factor=8, mode='bilinear') 
         
-        return lateral_map_5,lateral_map_3,lateral_map_2,lateral_map_1
+        return lateral_map_5, lateral_map_3, lateral_map_2, lateral_map_1
