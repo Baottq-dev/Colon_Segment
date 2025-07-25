@@ -1,8 +1,33 @@
-/data
-/snapshots
-/logs
-/pretrained
-testcode.ipynb
-.gitignore
-*.pdf
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+venv/
+env/
+.env/
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Local configuration
+.DS_Store
+
+# Large model files and data
 *.pth
+snapshots/
+pretrained/
+Data/
+logs/

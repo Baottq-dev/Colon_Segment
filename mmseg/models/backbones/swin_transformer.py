@@ -206,7 +206,6 @@ class SwinTransformerBlock(nn.Module):
             # Điều chỉnh lại nếu L không phải là số chính phương
             if H * W < L:
                 H += 1
-            print(f"SwinTransformerBlock auto-adjust: L={L}, adjusted to H={H}, W={W}")
             # Reshape x để có đúng H*W tokens
             x = x[:, :H*W, :]
             L = H * W
@@ -272,7 +271,6 @@ class PatchMerging(nn.Module):
         
         # Thay vì kiểm tra nghiêm ngặt, chúng ta reshape lại x để phù hợp với H*W
         if L != H * W:
-            print(f"Auto-reshape tokens: L={L}, H*W={H*W}")
             # Reshape lại x để số token khớp với H*W
             x = x[:, :H*W, :]
             L = H * W
@@ -367,7 +365,6 @@ class BasicLayer(nn.Module):
         # Đảm bảo kích thước token phù hợp
         B, L, C = x.shape
         if L != H * W:
-            print(f"BasicLayer auto-reshape: L={L}, H*W={H*W}")
             # Chủ động điều chỉnh số token để phù hợp với H*W
             if L > H * W:
                 # Trường hợp có quá nhiều token, cắt bớt
@@ -417,7 +414,6 @@ class PatchEmbed(nn.Module):
         if H != self.img_size[0] or W != self.img_size[1]:
             import torch.nn.functional as F
             x = F.interpolate(x, size=(self.img_size[0], self.img_size[1]), mode='bilinear', align_corners=False)
-            print(f"Auto-resized input from {H}x{W} to {self.img_size[0]}x{self.img_size[1]}")
         
         x = self.proj(x).flatten(2).transpose(1, 2)  # B Ph*Pw C
         if self.norm is not None:

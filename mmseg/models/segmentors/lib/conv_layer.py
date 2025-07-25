@@ -10,10 +10,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class Conv(nn.Module):
-    def __init__(self, nIn, nOut, kSize, stride, padding, dilation=(1, 1), groups=1, bn_acti=False, bias=False):
+    def __init__(self, nIn, nOut, kSize, stride=1, padding=0, dilation=(1, 1), groups=1, bn_acti=False, bias=False):
         super().__init__()
-        
-        # Lưu lại tham số để có thể tái tạo module khi cần thiết
         self.nIn = nIn
         self.nOut = nOut
         self.kSize = kSize
@@ -25,35 +23,39 @@ class Conv(nn.Module):
         self.bias = bias
         
         self._init_layers()
-            
-    def _init_layers(self):
-        """Khởi tạo hoặc tái tạo các lớp với tham số hiện tại"""
-        self.conv = nn.Conv2d(self.nIn, self.nOut, kernel_size=self.kSize,
-                              stride=self.stride, padding=self.padding,
-                              dilation=self.dilation, groups=self.groups, bias=self.bias)
         
+    def _init_layers(self, device=None):
+        self.conv = nn.Conv2d(self.nIn, self.nOut, self.kSize, 
+                             stride=self.stride, padding=self.padding, 
+                             bias=self.bias, groups=self.groups, 
+                             dilation=self.dilation)
         if self.bn_acti:
             self.bn_relu = BNPReLU(self.nOut)
-            
+        
+        # Chuyển các layers sang device chỉ định nếu cần
+        if device is not None:
+            self.conv.to(device)
+            if self.bn_acti:
+                self.bn_relu.to(device)
+                
     def forward(self, input):
         # Kiểm tra xem kích thước kênh đầu vào có thay đổi hay không
         if input.size(1) != self.nIn:
-            print(f"Conv: Auto-adjusting for channel size change: {self.nIn} -> {input.size(1)}")
-            # Kiểm tra nếu nOut cũng cần điều chỉnh theo tỷ lệ
-            if self.nOut == self.nIn:
-                self.nOut = input.size(1)
-            elif self.groups == self.nIn:  # Depthwise convolution
-                self.nOut = self.nOut * (input.size(1) // self.nIn)
-                self.groups = input.size(1)
-                
             self.nIn = input.size(1)
-            self._init_layers()
+            
+            # Nếu số kênh ra bằng số kênh vào hoặc nếu groups=nIn (depthwise conv)
+            # thì số kênh ra và groups cũng phải được thay đổi
+            if self.nOut == self.nIn or self.groups == self.nIn:
+                self.nOut = self.nIn
+            if self.groups == self.nIn:
+                self.groups = self.nIn
+                
+            self._init_layers(device=input.device)
             
         output = self.conv(input)
-
         if self.bn_acti:
             output = self.bn_relu(output)
-
+            
         return output
     
     
@@ -62,18 +64,21 @@ class BNPReLU(nn.Module):
         super().__init__()
         self.nIn = nIn
         self._init_layers()
-    
-    def _init_layers(self):
-        """Khởi tạo hoặc tái tạo các lớp với kích thước kênh hiện tại"""
+        
+    def _init_layers(self, device=None):
         self.bn = nn.BatchNorm2d(self.nIn, eps=1e-3)
         self.acti = nn.PReLU(self.nIn)
-
+        
+        # Chuyển các layers sang device chỉ định nếu cần
+        if device is not None:
+            self.bn.to(device)
+            self.acti.to(device)
+        
     def forward(self, input):
         # Kiểm tra xem kích thước kênh đầu vào có thay đổi hay không
         if input.size(1) != self.nIn:
-            print(f"BNPReLU: Auto-adjusting for channel size change: {self.nIn} -> {input.size(1)}")
             self.nIn = input.size(1)
-            self._init_layers()
+            self._init_layers(device=input.device)
             
         output = self.bn(input)
         output = self.acti(output)

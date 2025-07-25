@@ -115,6 +115,7 @@ class Dataset(torch.utils.data.Dataset):
             image = augmented['image']
             mask = augmented['mask']
             
+            
         # Luôn resize về đúng kích thước cuối cùng
         image = cv2.resize(image, (self.trainsize, self.trainsize))
         mask = cv2.resize(mask, (self.trainsize, self.trainsize))

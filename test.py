@@ -1870,7 +1870,7 @@ def main():
     else:
         # MiT backbone (mặc định)
         backbone_cfg = dict(
-            type='mit_{}'.format(args.backbone),
+        type='mit_{}'.format(args.backbone),
             style='pytorch',
         )
     

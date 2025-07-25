@@ -4,6 +4,26 @@ An implementation of ColonFormer - an efficient colon polyp segmentation method 
 
 **Note**: This is a modified version compatible with MMCV 2.2.0. The original repository and official paper can be found at [ducnt9907/ColonFormer](https://github.com/ducnt9907/ColonFormer).
 
+## Table of Contents
+- [Key Features](#key-features)
+- [Project Structure](#project-structure)
+- [Environment Setup](#environment-setup)
+- [Dataset Preparation](#dataset-preparation)
+- [Usage](#usage)
+- [Model Architecture](#model-architecture)
+- [Loss Functions](#loss-functions)
+- [Performance Metrics](#performance-metrics)
+- [Automated Features](#automated-features)
+- [Model Variants and Performance](#model-variants-and-performance)
+- [Changes from Original Version](#changes-from-original-version)
+- [Technical Requirements](#technical-requirements)
+- [Advanced Usage](#advanced-usage)
+- [Citation](#citation)
+- [Acknowledgments](#acknowledgments)
+- [License](#license)
+- [Contributing](#contributing)
+- [Issues and Support](#issues-and-support)
+
 ## Key Features
 
 ### Architecture Components
@@ -32,6 +52,60 @@ An implementation of ColonFormer - an efficient colon polyp segmentation method 
 - **Combo Loss**: Combination of Dice and BCE losses
 - **Boundary Loss**: Gradient-based boundary preservation
 - **Unified Focal Loss**: Advanced focal loss with delta parameter
+
+## Project Structure
+
+```
+Colon_Segment/
+├── mmseg/                   # Core segmentation modules
+│   ├── apis/                # API functions for training/testing
+│   ├── core/                # Core functionality
+│   ├── datasets/            # Dataset implementations
+│   ├── models/              # Model definitions
+│   │   ├── backbones/       # Backbone networks
+│   │   ├── decode_heads/    # Decoding head components
+│   │   ├── losses/          # Loss functions
+│   │   ├── segmentors/      # Segmentor implementations
+│   │   │   └── lib/         # Custom libraries for ColonFormer
+│   ├── ops/                 # Operators and functions
+│   └── utils/               # Utility functions
+├── Data/                    # Data directory (ignored by git)
+│   ├── TrainDataset/        # Training data
+│   │   ├── image/           # Training images
+│   │   └── mask/            # Training masks
+│   └── TestDataset/         # Test datasets
+│       ├── Kvasir/          # Kvasir dataset
+│       ├── ETIS-LaribPolypDB/ # ETIS dataset
+│       ├── CVC-ColonDB/     # CVC-ColonDB dataset
+│       ├── CVC-ClinicDB/    # CVC-ClinicDB dataset
+│       └── CVC-300/         # CVC-300 dataset
+├── snapshots/               # Model snapshots (ignored by git)
+│   ├── [model_name_1]/      # Directory for each trained model
+│   │   ├── last.pth         # Latest model checkpoint
+│   │   ├── epoch_20.pth     # Epoch-specific checkpoints
+│   │   └── final.pth        # Final model weights
+├── logs/                    # Log files (ignored by git)
+│   ├── train_*.log          # Training logs
+│   └── test_*.log           # Testing logs
+├── results/                 # Visual results (ignored by git)
+│   └── compa.png            # Comparison visualization
+├── test_results/            # Test result metrics
+│   ├── test_results_summary.csv     # Summary results
+│   └── test_results_detailed.json   # Detailed results
+├── Explain/                 # Explanation materials
+│   └── ColonFormer_Technical_Guide_VN.md  # Technical guide
+├── train.py                 # Training script
+├── test.py                  # Testing script
+├── complete_auto_system.py  # Automated workflow system
+├── auto_rename_snapshots.py # Model management utility
+├── utils.py                 # Utility functions
+├── gpu_check.py             # GPU verification utility
+├── test_auto_detect.py      # Auto-detection testing
+├── test_with_component_loss.py # Component loss testing
+├── ColonFormer_Inference_Notebook.ipynb # Inference notebook
+├── requirements.txt         # Dependency requirements
+└── README.md                # This file
+```
 
 ## Environment Setup
 
@@ -69,25 +143,25 @@ pip install -r requirements.txt
 1. **Training Dataset**:
 
    - Download from [Google Drive](https://drive.google.com/file/d/1lODorfB33jbd-im-qrtUgWnZXxB94F55/view)
-   - Extract to `./data/TrainDataset/`
+   - Extract to `./Data/TrainDataset/`
 
 2. **Testing Dataset**:
    - Download from [Google Drive](https://drive.google.com/file/d/1o8OfBvYE6K-EpDyvzsmMPndnUMwb540R/view)
-   - Extract to `./data/TestDataset/`
+   - Extract to `./Data/TestDataset/`
 
 ### Data Structure
 
 Organize your data as follows:
 
 ```
-data/
+Data/
 ├── TrainDataset/
 │   ├── image/          # Training images
-│   └── mask/           # Corresponding masks
+│   └── mask/           # Corresponding masks (binary polyp segmentation masks)
 └── TestDataset/
     ├── Kvasir/         # Dataset 1
-    │   ├── images/
-    │   └── masks/
+    │   ├── images/     # Test images
+    │   └── masks/      # Ground truth masks
     ├── ETIS-LaribPolypDB/  # Dataset 2
     │   ├── images/
     │   └── masks/
@@ -109,23 +183,23 @@ data/
 **Basic Training:**
 
 ```bash
-python train.py --backbone b3 --train_path ./data/TrainDataset
+python train.py --backbone b3 --train_path ./Data/TrainDataset
 ```
 
 **Advanced Training with Custom Parameters:**
 
-````bash
+```bash
 python train.py \
     --backbone b3 \
     --num_epochs 50 \
     --batchsize 16 \
     --init_lr 1e-4 \
-    --train_path ./data/TrainDataset \
+    --train_path ./Data/TrainDataset \
     --resume_path ./snapshots/ColonFormer.../last.pth \
     --loss_type tversky \
     --tversky_alpha 0.7 \
     --tversky_beta 0.3
-```w
+```
 
 **Training Parameters:**
 
@@ -154,7 +228,7 @@ python test.py \
     --backbone b3 \
     --weight ./snapshots/ColonFormerB3/last.pth \
     --test_dataset Kvasir
-````
+```
 
 **Test on All Datasets:**
 
@@ -168,7 +242,7 @@ python test.py \
 **Auto-test Untested Models:**
 
 ```bash
-python test.py --auto_test --test_path ./data/TestDataset
+python test.py --auto_test --test_path ./Data/TestDataset
 ```
 
 **Show All Results:**
@@ -187,7 +261,7 @@ python test.py --compare
 
 - `--backbone`: Backbone version used in training
 - `--weight`: Path to trained checkpoint
-- `--test_path`: Path to test datasets (default: ./data/TestDataset)
+- `--test_path`: Path to test datasets (default: ./Data/TestDataset)
 - `--test_dataset`: Specific dataset (Kvasir, ETIS-LaribPolypDB, CVC-ColonDB, CVC-ClinicDB, CVC-300) or 'all'
 
 ### Automated Workflow System
@@ -388,7 +462,14 @@ Combines Focal Loss and weighted IoU Loss for handling class imbalance and bound
 ### Jupyter Notebook Integration
 
 - `ColonFormer_Inference_Notebook.ipynb`: Interactive inference and visualization
-- `testcode.ipynb`: Development and testing notebook
+- Use this notebook for quick testing and visualization of model outputs
+
+### GPU Verification
+
+```bash
+# Check if GPU is available and properly configured
+python gpu_check.py
+```
 
 ### Result Analysis
 
@@ -416,6 +497,23 @@ python train.py \
     --batchsize 32 \
     --init_lr 5e-5
 ```
+
+### Common Issues and Fixes
+
+1. **CUDA Out of Memory**:
+   - Reduce batch size
+   - Try a smaller backbone (b1 or b2)
+   - Reduce image size with `--init_trainsize`
+
+2. **Dataset Loading Errors**:
+   - Verify dataset paths and folder structure
+   - Check file permissions
+   - Ensure image and mask files match correctly
+
+3. **Training Instability**:
+   - Try gradient clipping (`--clip 0.5`)
+   - Reduce learning rate
+   - Try different loss functions
 
 ## Citation
 
